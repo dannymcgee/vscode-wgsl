@@ -1,0 +1,15 @@
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"outDir": "../../dist/vscode-wgsl",
+		"declaration": true,
+		"types": [],
+		"strictNullChecks": false,
+		"target": "es2015",
+		"module": "CommonJS",
+		"moduleResolution": "node",
+		"lib": ["es2017"]
+	},
+	"include": ["**/*.ts"],
+	"exclude": ["**/*.spec.ts"]
+}

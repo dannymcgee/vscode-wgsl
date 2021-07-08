@@ -3,5 +3,7 @@
 		"nrwl.angular-console",
 		"esbenp.prettier-vscode",
 		"matklad.rust-analyzer",
-	],
+		"dbaeumer.vscode-eslint",
+		"firsttris.vscode-jest-runner"
+	]
 }

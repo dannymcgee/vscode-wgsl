@@ -1,0 +1,47 @@
+{
+	"name": "vscode-wgsl",
+	"displayName": "WGSL Language Support",
+	"description": "Rich language support for the WebGPU Shading Language",
+	"version": "1.0.0",
+	"main": "main.js",
+	"author": "Danny McGee <dannymcgee@gmail.com>",
+	"publisher": "dannymcgee",
+	"license": "MIT",
+	"engines": {
+		"vscode": "^1.52.0"
+	},
+	"repository": {
+		"types": "git",
+		"url": "TODO"
+	},
+	"contributes": {
+		"languages": [
+			{
+				"id": "wgsl",
+				"aliases": [
+					"WebGPU Shading Language",
+					"WGSL"
+				],
+				"extensions": [
+					".wgsl"
+				],
+				"configuration": "./wgsl.config.json"
+			}
+		],
+		"grammars": [
+			{
+				"language": "wgsl",
+				"scopeName": "source.wgsl",
+				"path": "./wgsl.tmLanguage.json"
+			}
+		]
+	},
+	"configurationDefaults": {
+		"[wgsl]": {
+			"editor.semanticHighlighting.enabled": true
+		}
+	},
+	"activationEvents": [
+		"onLanguage:wgsl"
+	]
+}

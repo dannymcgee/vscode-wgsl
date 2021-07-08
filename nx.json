@@ -26,7 +26,17 @@
 			}
 		]
 	},
-	"projects": {},
+	"projects": {
+		"client": {
+			"tags": []
+		},
+		"grammar": {
+			"tags": []
+		},
+		"server": {
+			"tags": []
+		}
+	},
 	"workspaceLayout": {
 		"appsDir": "packages",
 		"libsDir": "packages"
