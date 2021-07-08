@@ -1,18 +1,17 @@
 use lsp_server::{Connection, Message};
 use lsp_types::{
-	request::{HoverRequest, Request},
+	request::{HoverRequest, Request, SemanticTokensFullRequest},
 	InitializeParams,
 };
 use serde_json as json;
 
 mod capabilities;
 mod hover;
+mod semtok;
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 
 fn main() -> Result<(), Error> {
-	eprintln!("Starting WGSL Language Server");
-
 	let (cx, io_threads) = Connection::stdio();
 	let capabilities = capabilities::define();
 	let init_params = cx.initialize(capabilities)?;
@@ -21,7 +20,6 @@ fn main() -> Result<(), Error> {
 
 	io_threads.join()?;
 
-	eprintln!("Stopping WGSL Language Server");
 	Ok(())
 }
 
@@ -37,8 +35,10 @@ fn main_loop(cx: &Connection, params: json::Value) -> Result<(), Error> {
 					return Ok(());
 				}
 
+				#[rustfmt::skip]
 				let response = match &req.method[..] {
-					HoverRequest::METHOD => hover::handle(req),
+					HoverRequest::METHOD              => hover::handle(req),
+					SemanticTokensFullRequest::METHOD => semtok::handle(req),
 					_ => None,
 				};
 
