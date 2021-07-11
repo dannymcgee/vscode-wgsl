@@ -1,7 +1,7 @@
 use lsp_types::{
 	DocumentSymbolOptions, HoverProviderCapability, OneOf, SemanticTokensFullOptions,
 	SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities,
-	ServerCapabilities, WorkDoneProgressOptions,
+	ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, WorkDoneProgressOptions,
 };
 use serde_json as json;
 
@@ -23,6 +23,9 @@ pub fn define() -> json::Value {
 			label: None,
 			work_done_progress_options: WorkDoneProgressOptions::default(),
 		})),
+		text_document_sync: Some(TextDocumentSyncCapability::Kind(
+			TextDocumentSyncKind::Incremental,
+		)),
 		..Default::default()
 	})
 	.unwrap()

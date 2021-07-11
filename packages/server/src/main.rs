@@ -1,9 +1,15 @@
 use lsp_server::{Connection, Message};
 use lsp_types::{
+	notification::{
+		DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, Notification,
+	},
 	request::{DocumentSymbolRequest, HoverRequest, Request, SemanticTokensFullRequest},
+	DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
 	InitializeParams,
 };
 use serde_json as json;
+
+use crate::documents::Documents;
 
 #[macro_use]
 extern crate lazy_static;
@@ -30,11 +36,13 @@ fn main() -> Result<(), Error> {
 
 fn main_loop(cx: &Connection, params: json::Value) -> Result<(), Error> {
 	let _: InitializeParams = json::from_value(params).unwrap();
+	let documents = Documents::new();
 
 	let rx = cx.receiver.clone();
 	let tx = cx.sender.clone();
 
 	for msg in rx {
+		#[allow(unused_must_use)]
 		match msg {
 			Message::Request(req) => {
 				eprintln!("[Request] {}", req.method);
@@ -46,7 +54,9 @@ fn main_loop(cx: &Connection, params: json::Value) -> Result<(), Error> {
 				match &req.method[..] {
 					HoverRequest::METHOD => hover::handle(req, tx.clone()),
 					SemanticTokensFullRequest::METHOD => semtok::handle(req, tx.clone()),
-					DocumentSymbolRequest::METHOD => docsym::handle(req, tx.clone()),
+					DocumentSymbolRequest::METHOD => {
+						docsym::handle(req, documents.clone(), tx.clone())
+					}
 					_ => {}
 				}
 			}
@@ -54,7 +64,32 @@ fn main_loop(cx: &Connection, params: json::Value) -> Result<(), Error> {
 				eprintln!("{:?}", res);
 			}
 			Message::Notification(notif) => {
-				eprintln!("{:?}", notif);
+				eprintln!("[Notification] {}", notif.method);
+
+				match &notif.method[..] {
+					DidOpenTextDocument::METHOD => {
+						let params = notif
+							.extract::<DidOpenTextDocumentParams>(DidOpenTextDocument::METHOD)
+							.unwrap();
+
+						documents.open(&params.text_document.uri, params.text_document.text);
+					}
+					DidChangeTextDocument::METHOD => {
+						let params = notif
+							.extract::<DidChangeTextDocumentParams>(DidChangeTextDocument::METHOD)
+							.unwrap();
+
+						documents.update(params);
+					}
+					DidCloseTextDocument::METHOD => {
+						let params = notif
+							.extract::<DidCloseTextDocumentParams>(DidCloseTextDocument::METHOD)
+							.unwrap();
+
+						documents.close(&params.text_document.uri);
+					}
+					_ => {}
+				}
 			}
 		}
 	}

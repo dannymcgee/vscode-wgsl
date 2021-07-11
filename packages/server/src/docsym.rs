@@ -16,16 +16,16 @@ use parser::{
 };
 use serde_json as json;
 
-use crate::documents;
+use crate::documents::Documents;
 
-pub fn handle(req: lsp_server::Request, tx: Sender<Message>) {
+pub fn handle(req: lsp_server::Request, documents: Documents, tx: Sender<Message>) {
 	thread::spawn(move || {
 		let (id, params) = req
 			.extract::<DocumentSymbolParams>(DocumentSymbolRequest::METHOD)
 			.unwrap();
 
 		#[allow(unused_must_use)]
-		match documents::read(&params.text_document) {
+		match documents.read(&params.text_document.uri) {
 			Ok(content) => match parser::parse(&content) {
 				Ok(result) => {
 					let symbols = result.into_symbols();

@@ -1,4 +1,4 @@
-import { ExtensionContext } from "vscode";
+import { ExtensionContext, workspace } from "vscode";
 import {
 	LanguageClient,
 	ProtocolRequestType,
@@ -22,6 +22,9 @@ export function activate(_: ExtensionContext) {
 		debug: exe,
 	}, {
 		documentSelector: [{ scheme: "file", language: "wgsl" }],
+		synchronize: {
+			fileEvents: workspace.createFileSystemWatcher("**/*.wgsl"),
+		},
 	});
 
 	client.start();

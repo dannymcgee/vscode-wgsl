@@ -13,6 +13,7 @@ lsp-server = "0.5"
 lsp-types = "0.89"
 naga = { version = "0.5", features = ["wgsl-in"] }
 parser = { path = "../parser" }
+ropey = "1.3"
 serde_json = "1"
 serde = { version = "1", features = ["derive"] }
 urlencoding = "1.3"
