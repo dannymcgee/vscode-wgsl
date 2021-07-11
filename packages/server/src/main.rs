@@ -1,11 +1,16 @@
 use lsp_server::{Connection, Message};
 use lsp_types::{
-	request::{HoverRequest, Request, SemanticTokensFullRequest},
+	request::{DocumentSymbolRequest, HoverRequest, Request, SemanticTokensFullRequest},
 	InitializeParams,
 };
 use serde_json as json;
 
+#[macro_use]
+extern crate lazy_static;
+
 mod capabilities;
+mod docsym;
+mod documents;
 mod hover;
 mod semtok;
 
@@ -26,7 +31,10 @@ fn main() -> Result<(), Error> {
 fn main_loop(cx: &Connection, params: json::Value) -> Result<(), Error> {
 	let _: InitializeParams = json::from_value(params).unwrap();
 
-	for msg in &cx.receiver {
+	let rx = cx.receiver.clone();
+	let tx = cx.sender.clone();
+
+	for msg in rx {
 		match msg {
 			Message::Request(req) => {
 				eprintln!("[Request] {}", req.method);
@@ -35,22 +43,18 @@ fn main_loop(cx: &Connection, params: json::Value) -> Result<(), Error> {
 					return Ok(());
 				}
 
-				#[rustfmt::skip]
-				let response = match &req.method[..] {
-					HoverRequest::METHOD              => hover::handle(req),
-					SemanticTokensFullRequest::METHOD => semtok::handle(req),
-					_ => None,
-				};
-
-				if let Some(res) = response {
-					cx.sender.send(Message::Response(res))?;
+				match &req.method[..] {
+					HoverRequest::METHOD => hover::handle(req, tx.clone()),
+					SemanticTokensFullRequest::METHOD => semtok::handle(req, tx.clone()),
+					DocumentSymbolRequest::METHOD => docsym::handle(req, tx.clone()),
+					_ => {}
 				}
 			}
 			Message::Response(res) => {
-				eprintln!("{:#?}", res);
+				eprintln!("{:?}", res);
 			}
 			Message::Notification(notif) => {
-				eprintln!("{:#?}", notif);
+				eprintln!("{:?}", notif);
 			}
 		}
 	}

@@ -1,6 +1,7 @@
 use lsp_types::{
-	HoverProviderCapability, SemanticTokensFullOptions, SemanticTokensLegend,
-	SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities,
+	DocumentSymbolOptions, HoverProviderCapability, OneOf, SemanticTokensFullOptions,
+	SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities,
+	ServerCapabilities, WorkDoneProgressOptions,
 };
 use serde_json as json;
 
@@ -18,6 +19,10 @@ pub fn define() -> json::Value {
 				..Default::default()
 			},
 		)),
+		document_symbol_provider: Some(OneOf::Right(DocumentSymbolOptions {
+			label: None,
+			work_done_progress_options: WorkDoneProgressOptions::default(),
+		})),
 		..Default::default()
 	})
 	.unwrap()
