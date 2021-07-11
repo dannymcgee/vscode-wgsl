@@ -49,22 +49,6 @@
 				}
 			}
 		},
-		"naga": {
-			"root": "packages/naga",
-			"projectType": "library",
-			"sourceRoot": "packages/naga/src",
-			"targets": {
-				"build": {
-					"executor": "@nxrs/cargo:build"
-				},
-				"test": {
-					"executor": "@nxrs/cargo:test"
-				},
-				"lint": {
-					"executor": "@nxrs/cargo:clippy"
-				}
-			}
-		},
 		"parser": {
 			"root": "packages/parser",
 			"projectType": "library",

@@ -1,6 +1,5 @@
 [workspace]
 members = [
 	"packages/parser",
-	"packages/naga",
 	"packages/server"
 ]
