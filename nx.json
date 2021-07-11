@@ -1,7 +1,7 @@
 {
 	"npmScope": "wgsl",
 	"affected": {
-		"defaultBase": "master"
+		"defaultBase": "main"
 	},
 	"implicitDependencies": {
 		"package.json": {
@@ -28,9 +28,13 @@
 	},
 	"projects": {
 		"client": {
-			"tags": []
+			"tags": [],
+			"implicitDependencies": ["server"]
 		},
 		"grammar": {
+			"tags": []
+		},
+		"parser": {
 			"tags": []
 		},
 		"server": {

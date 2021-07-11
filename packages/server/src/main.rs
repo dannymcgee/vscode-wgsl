@@ -1,18 +1,22 @@
 use lsp_server::{Connection, Message};
 use lsp_types::{
-	request::{HoverRequest, Request},
+	request::{DocumentSymbolRequest, HoverRequest, Request, SemanticTokensFullRequest},
 	InitializeParams,
 };
 use serde_json as json;
 
+#[macro_use]
+extern crate lazy_static;
+
 mod capabilities;
+mod docsym;
+mod documents;
 mod hover;
+mod semtok;
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 
 fn main() -> Result<(), Error> {
-	eprintln!("Starting WGSL Language Server");
-
 	let (cx, io_threads) = Connection::stdio();
 	let capabilities = capabilities::define();
 	let init_params = cx.initialize(capabilities)?;
@@ -21,14 +25,16 @@ fn main() -> Result<(), Error> {
 
 	io_threads.join()?;
 
-	eprintln!("Stopping WGSL Language Server");
 	Ok(())
 }
 
 fn main_loop(cx: &Connection, params: json::Value) -> Result<(), Error> {
 	let _: InitializeParams = json::from_value(params).unwrap();
 
-	for msg in &cx.receiver {
+	let rx = cx.receiver.clone();
+	let tx = cx.sender.clone();
+
+	for msg in rx {
 		match msg {
 			Message::Request(req) => {
 				eprintln!("[Request] {}", req.method);
@@ -37,20 +43,18 @@ fn main_loop(cx: &Connection, params: json::Value) -> Result<(), Error> {
 					return Ok(());
 				}
 
-				let response = match &req.method[..] {
-					HoverRequest::METHOD => hover::handle(req),
-					_ => None,
-				};
-
-				if let Some(res) = response {
-					cx.sender.send(Message::Response(res))?;
+				match &req.method[..] {
+					HoverRequest::METHOD => hover::handle(req, tx.clone()),
+					SemanticTokensFullRequest::METHOD => semtok::handle(req, tx.clone()),
+					DocumentSymbolRequest::METHOD => docsym::handle(req, tx.clone()),
+					_ => {}
 				}
 			}
 			Message::Response(res) => {
-				eprintln!("{:#?}", res);
+				eprintln!("{:?}", res);
 			}
 			Message::Notification(notif) => {
-				eprintln!("{:#?}", notif);
+				eprintln!("{:?}", notif);
 			}
 		}
 	}
