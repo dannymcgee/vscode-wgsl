@@ -487,5 +487,3 @@ program = {
 	)*
 	~ EOI
 }
-
-fucking_why = { global_variable_decl }

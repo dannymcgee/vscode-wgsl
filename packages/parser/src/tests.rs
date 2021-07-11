@@ -466,27 +466,6 @@ fn frag(in: VertexOutput) -> [[location(0)]] vec4<f32> {
 	}
 }
 
-#[test]
-fn fucking_why() {
-	let results = [
-		Parser::parse(
-			Rule::global_variable_decl,
-			"[[group(0), binding(0)]] var t_diffuse: texture_2d<f32>",
-		),
-		Parser::parse(Rule::variable_decl, "var t_diffuse: texture_2d<f32>"),
-		Parser::parse(Rule::variable_ident_decl, "t_diffuse: texture_2d<f32>"),
-		Parser::parse(Rule::type_decl, "texture_2d<f32>"),
-		Parser::parse(
-			Rule::program,
-			"[[group(0), binding(0)]] var t_diffuse: texture_2d<f32>;",
-		),
-	];
-
-	for result in results {
-		assert_ok(result);
-	}
-}
-
 fn assert_ok(result: Result) {
 	if let Err(err) = result {
 		println!("{}", err);
