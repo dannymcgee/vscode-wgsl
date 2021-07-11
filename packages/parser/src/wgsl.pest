@@ -1,0 +1,491 @@
+// https://www.w3.org/TR/WGSL/#textual-structure
+
+COMMENT    = _{ "//" ~ ( !NEWLINE ~ ANY )* }
+WHITESPACE = _{ " " | "\t" | NEWLINE }
+
+// --- Tokens ------------------------------------------------------------------
+
+// Punctuation
+LBRACE      = @{ "{" }
+RBRACE      = @{ "}" }
+LBRACK      = @{ "[" }
+RBRACK      = @{ "]" }
+LDBRACK     = @{ "[[" }
+RDBRACK     = @{ "]]" }
+LPAREN      = @{ "(" }
+RPAREN      = @{ ")" }
+LANGLE      = @{ "<" }
+RANGLE      = @{ ">" }
+
+// Operators
+AND         = @{ "&" }
+AND_AND     = @{ "&&" }
+ARROW       = @{ "->" }
+BANG        = @{ "!" }
+COLON       = @{ ":" }
+COMMA       = @{ "," }
+DOT         = @{ "." }
+EQUAL       = @{ "=" }
+EQUAL_EQUAL = @{ "==" }
+GT          = @{ ">" }
+GTE         = @{ ">=" }
+LSHIFT      = @{ "<<" }
+LT          = @{ "<" }
+LTE         = @{ "<=" }
+MINUS       = @{ "-" }
+MINUS_MINUS = @{ "--" }
+MODULO      = @{ "%" }
+NOT_EQUAL   = @{ "!=" }
+OR          = @{ "|" }
+OR_OR       = @{ "||" }
+PLUS        = @{ "+" }
+PLUS_PLUS   = @{ "++" }
+RSHIFT      = @{ ">>" }
+SEMICOLON   = @{ ";" }
+SLASH       = @{ "/" }
+STAR        = @{ "*" }
+TILDE       = @{ "~" }
+XOR         = @{ "^" }
+
+// Builtin types
+ARRAY       = @{ "array" }
+ATOMIC      = @{ "atomic" }
+BOOL        = @{ "bool" }
+FLOAT32     = @{ "f32" }
+INT32       = @{ "i32" }
+UINT32      = @{ "u32" }
+MATRIX      = @{ "mat" ~ '2'..'4' ~ "x" ~ '2'..'4' }
+PTR         = @{ "ptr" }
+SAMPLER     = @{ "sampler" ~ "_comparison"? }
+VEC         = @{ "vec" ~ '2'..'4' }
+
+MULTISAMPLED_TEXTURE_TYPE = @{ "texture_multisampled_2d" }
+EXTERN_TEXTURE_TYPE       = @{ "texture_external" }
+DEPTH_TEXTURE_TYPE        = @{ "texture_depth_" ~ "2d"|"cube" ~ "_array"? }
+SAMPLER_TYPE              = @{ "sampler" ~ "_comparison"? }
+
+SAMPLED_TEXTURE_TYPE = @{
+	"texture_"
+	~ (
+		"1d"
+		| "2d_array"
+		| "2d"
+		| "3d"
+		| "cube_array"
+		| "cube"
+	)
+}
+
+STORAGE_TEXTURE_TYPE = @{
+	"texture_storage_"
+	~ (
+		"1d"
+		| "2d_array"
+		| "2d"
+		| "3d"
+	)
+}
+
+// Storage keywords
+FN          = @{ "fn" }
+LET         = @{ "let" }
+STRUCT      = @{ "struct" }
+TYPE        = @{ "type" }
+VAR         = @{ "var" }
+
+// Storage modifiers
+FUNCTION    = @{ "function" }
+PRIVATE     = @{ "private" }
+READ        = @{ "read" }
+READ_WRITE  = @{ "read_write" }
+STORAGE     = @{ "storage" }
+UNIFORM     = @{ "uniform" }
+WORKGROUP   = @{ "workgroup" }
+WRITE       = @{ "write" }
+
+// Control keywords
+BREAK       = @{ "break" }
+CASE        = @{ "case" }
+CONTINUE    = @{ "continue" }
+CONTINUING  = @{ "continuing" }
+DEFAULT     = @{ "default" }
+ELSE        = @{ "else" }
+ELSE_IF     = @{ "elseif" }
+FALLTHROUGH = @{ "fallthrough" }
+FOR         = @{ "for" }
+IF          = @{ "if" }
+LOOP        = @{ "loop" }
+RETURN      = @{ "return" }
+SWITCH      = @{ "switch" }
+
+// Builtin constants
+FALSE       = @{ "false" }
+TRUE        = @{ "true" }
+
+// Directives
+BITCAST     = @{ "bitcast" }
+DISCARD     = @{ "discard" }
+ENABLE      = @{ "enable" }
+
+// Other...?
+BLOCK       = @{ "block" }
+
+
+// --- Literals ----------------------------------------------------------------
+
+SIGN = @{ PLUS | MINUS }
+
+// (-?[0-9]*.[0-9]+ | -?[0-9]+.[0-9]*)((e|E)(+|-)?[0-9]+)?
+DECIMAL_FLOAT_LITERAL = @{
+	  MINUS? ~ ASCII_DIGIT* ~ DOT ~ ASCII_DIGIT+
+	| MINUS? ~ ASCII_DIGIT+ ~ DOT ~ ASCII_DIGIT*
+	~ ( ("e"|"E") ~ SIGN? ~ ASCII_DIGIT+ )?
+}
+
+// -?0x([0-9a-fA-F]*.?[0-9a-fA-F]+ | [0-9a-fA-F]+.[0-9a-fA-F]*)(p|P)(+|-)?[0-9]+
+HEX_FLOAT_LITERAL = @{
+	MINUS?
+	~ "0x"
+	~ ASCII_HEX_DIGIT* ~ DOT? ~ ASCII_HEX_DIGIT+
+	| ASCII_HEX_DIGIT+ ~ DOT  ~ ASCII_HEX_DIGIT*
+	~ ("p"|"P")
+	~ SIGN?
+	~ ASCII_DIGIT+
+}
+
+// -?0x[0-9a-fA-F]+ | 0 | -?[1-9][0-9]*
+INT_LITERAL = @{
+	MINUS? ~ "0x" ~ ASCII_HEX_DIGIT+
+	| "0"
+	| MINUS? ~ ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*
+}
+
+// 0x[0-9a-fA-F]+u | 0u | [1-9][0-9]*u
+UINT_LITERAL = @{
+	"0x" ~ ASCII_HEX_DIGIT+ ~ "u"
+	| "0u"
+	| ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* ~ "u"
+}
+
+FLOAT_LITERAL = @{ DECIMAL_FLOAT_LITERAL | HEX_FLOAT_LITERAL }
+
+const_literal = {
+	FLOAT_LITERAL
+	| UINT_LITERAL
+	| INT_LITERAL
+	| TRUE
+	| FALSE
+}
+
+
+// --- Identifiers -------------------------------------------------------------
+
+IDENT = @{
+	ASCII_ALPHA ~ ( ASCII_ALPHA | ASCII_DIGIT | "_" )*
+}
+
+attribute = {
+	IDENT ~ LPAREN ~ literal_or_ident ~ RPAREN
+	| IDENT
+}
+attribute_list = { LDBRACK ~ ( attribute ~ COMMA )* ~ attribute ~ RDBRACK }
+literal_or_ident = {
+	FLOAT_LITERAL
+	| INT_LITERAL
+	| UINT_LITERAL
+	| IDENT
+}
+
+
+// --- Types -------------------------------------------------------------------
+
+type_decl = {
+	BOOL
+	| FLOAT32
+	| INT32
+	| UINT32
+	| VEC ~ LANGLE ~ type_decl ~ RANGLE
+	| PTR
+		~ LANGLE ~ storage_class
+		~ COMMA ~ type_decl
+		~ ( COMMA ~ access_mode )?
+		~ RANGLE
+	| attribute_list*
+		~ ARRAY
+		~ LANGLE ~ type_decl ~ ( COMMA ~ INT_LITERAL )? ~ RANGLE
+	| MATRIX ~ LANGLE ~ type_decl ~ RANGLE
+	| texture_sampler_type
+	| IDENT
+}
+
+access_mode = @{ READ_WRITE | READ | WRITE }
+
+storage_class = @{
+	FUNCTION
+	| PRIVATE
+	| WORKGROUP
+	| UNIFORM
+	| STORAGE
+}
+
+texel_format = @{ IDENT } // TODO
+
+texture_sampler_type = {
+	SAMPLED_TEXTURE_TYPE
+		~ LANGLE ~ type_decl ~ RANGLE
+	| STORAGE_TEXTURE_TYPE
+		~ LANGLE ~ texel_format ~ COMMA ~ access_mode ~ RANGLE
+	| MULTISAMPLED_TEXTURE_TYPE
+		~ LANGLE ~ type_decl ~ RANGLE
+	| DEPTH_TEXTURE_TYPE
+	| SAMPLER_TYPE
+}
+
+struct_decl      = { attribute_list* ~ STRUCT ~ IDENT ~ struct_body_decl }
+struct_body_decl = { LBRACE ~ struct_member* ~ RBRACE }
+struct_member    = { attribute_list* ~ variable_ident_decl ~ SEMICOLON }
+
+type_alias = {
+	TYPE ~ IDENT ~ EQUAL ~ type_decl
+}
+
+
+// --- Variables ---------------------------------------------------------------
+
+variable_stmt = {
+	variable_decl ~ EQUAL ~ expression
+	| variable_decl
+	| LET ~ ( variable_ident_decl | IDENT ) ~ EQUAL ~ expression
+}
+variable_decl = {
+	VAR ~ variable_qualifier? ~ variable_ident_decl
+}
+variable_ident_decl = {
+	IDENT ~ COLON ~ attribute_list* ~ type_decl
+}
+variable_qualifier = {
+	LANGLE ~ storage_class ~ ( COMMA ~ access_mode )? ~ RANGLE
+}
+
+global_const_initializer = {
+	EQUAL ~ const_expr
+}
+global_variable_decl = {
+	attribute_list* ~ variable_decl ~ global_const_initializer?
+}
+global_constant_decl = {
+	attribute_list* ~ LET ~ variable_ident_decl ~ global_const_initializer?
+}
+
+const_expr = {
+	const_literal
+	| type_decl
+		~ LPAREN
+		~ (( const_expr ~ COMMA )*
+			~ const_expr ~ COMMA? )?
+		~ RPAREN
+}
+
+
+// --- Expressions -------------------------------------------------------------
+
+BINOP = ${
+	  OR_OR
+	| AND_AND
+	| OR
+	| XOR
+	| AND
+	| EQUAL_EQUAL
+	| NOT_EQUAL
+	| LTE
+	| GTE
+	| LSHIFT
+	| RSHIFT
+	| LT
+	| GT
+	| STAR
+	| SLASH
+	| MODULO
+	| PLUS
+	| MINUS
+}
+
+expression = {
+	singular_expr ~ ( BINOP ~ singular_expr )*
+}
+singular_expr = {
+	( unary_expr | primary_expr )
+	~ postfix_expr?
+}
+unary_expr = {
+	MINUS ~ singular_expr
+	| BANG ~ singular_expr
+	| TILDE ~ singular_expr
+	| STAR ~ singular_expr
+	| AND ~ singular_expr
+}
+primary_expr = {
+	type_decl ~ argument_expr_list
+	| const_literal
+	| paren_expr
+	| BITCAST ~ LANGLE ~ type_decl ~ RANGLE ~ paren_expr
+	| IDENT ~ argument_expr_list?
+}
+postfix_expr = {
+	LBRACK ~ expression ~ RBRACK ~ postfix_expr*
+	| DOT ~ IDENT ~ postfix_expr*
+}
+argument_expr_list = {
+	LPAREN
+	~ (( expression ~ COMMA )*
+		~ expression ~ COMMA? )?
+	~ RPAREN
+}
+paren_expr = {
+	LPAREN ~ expression ~ RPAREN
+}
+
+
+// --- Statements --------------------------------------------------------------
+
+statement = {
+	return_stmt ~ SEMICOLON
+	| if_stmt
+	| switch_stmt
+	| loop_stmt
+	| for_stmt
+	| func_call_stmt ~ SEMICOLON
+	| variable_stmt ~ SEMICOLON
+	| BREAK ~ SEMICOLON
+	| CONTINUE ~ SEMICOLON
+	| DISCARD ~ SEMICOLON
+	| assignment_stmt ~ SEMICOLON
+	| compound_stmt
+}
+
+compound_stmt = {
+	LBRACE ~ statement* ~ RBRACE
+}
+
+assignment_stmt = {
+	singular_expr ~ EQUAL ~ expression
+}
+
+if_stmt = {
+	IF ~ paren_expr
+	~ compound_stmt
+	~ elseif_stmt?
+	~ else_stmt?
+}
+elseif_stmt = {
+	ELSE_IF ~ paren_expr
+	~ compound_stmt
+	~ elseif_stmt?
+}
+else_stmt = {
+	ELSE ~ compound_stmt
+}
+
+switch_stmt = {
+	SWITCH ~ paren_expr
+	~ LBRACE
+	~ switch_body+
+	~ RBRACE
+}
+switch_body = {
+	( CASE ~ case_selectors
+		| DEFAULT )
+	~ COLON
+	~ LBRACE
+	~ case_body*
+	~ RBRACE
+}
+case_selectors = {
+	const_literal
+	~ ( COMMA ~ const_literal )*
+	~ COMMA?
+}
+case_body = {
+	FALLTHROUGH ~ SEMICOLON
+	| statement
+}
+
+loop_stmt = {
+	LOOP
+	~ LBRACE
+	~ statement*
+	~ continuing_stmt?
+	~ RBRACE
+}
+continuing_stmt = {
+	CONTINUING
+	~ compound_stmt
+}
+
+for_stmt = {
+	FOR
+	~ LPAREN
+	~ for_header
+	~ RPAREN
+	~ compound_stmt
+}
+for_header = {
+	( variable_stmt | assignment_stmt | func_call_stmt )? ~ SEMICOLON
+	~ expression? ~ SEMICOLON
+	~ ( assignment_stmt | func_call_stmt )?
+}
+
+return_stmt = {
+	RETURN ~ expression?
+}
+
+func_call_stmt = {
+	IDENT ~ argument_expr_list
+}
+
+
+// --- Functions ---------------------------------------------------------------
+
+func_decl = {
+	attribute_list*
+	~ func_header
+	~ compound_stmt
+}
+func_header = {
+	FN ~ IDENT
+	~ LPAREN
+	~ param_list?
+	~ RPAREN
+	~ func_return_type?
+}
+func_return_type = {
+	ARROW
+	~ attribute_list*
+	~ type_decl
+}
+param_list = {
+	( param ~ COMMA )*
+	~ param ~ COMMA?
+}
+param = {
+	attribute_list*
+	~ variable_ident_decl
+}
+
+
+// --- Program -----------------------------------------------------------------
+
+program = {
+	SOI
+	~ (
+		( global_variable_decl ~ SEMICOLON )
+		| ( global_constant_decl ~ SEMICOLON )
+		| ( type_alias ~ SEMICOLON )
+		| ( struct_decl ~ SEMICOLON )
+		| func_decl
+		| ( ENABLE ~ IDENT ~ SEMICOLON )
+	)*
+	~ EOI
+}
+
+fucking_why = { global_variable_decl }

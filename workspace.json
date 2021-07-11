@@ -65,6 +65,28 @@
 				}
 			}
 		},
+		"parser": {
+			"root": "packages/parser",
+			"projectType": "library",
+			"sourceRoot": "packages/parser/src",
+			"targets": {
+				"build": {
+					"executor": "@nxrs/cargo:build",
+					"options": {},
+					"configurations": {
+						"production": {
+							"release": true
+						}
+					}
+				},
+				"test": {
+					"executor": "@nxrs/cargo:test"
+				},
+				"lint": {
+					"executor": "@nxrs/cargo:clippy"
+				}
+			}
+		},
 		"server": {
 			"root": "packages/server",
 			"projectType": "application",
@@ -74,6 +96,12 @@
 					"executor": "@nxrs/cargo:build",
 					"options": {
 						"outDir": "dist/vscode-wgsl"
+					},
+					"configurations": {
+						"production": {
+							"outDir": "dist/vscode-wgsl",
+							"release": true
+						}
 					}
 				},
 				"test": {
