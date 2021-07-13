@@ -53,13 +53,7 @@ trait AstNodeParser {
 impl<'a> AstParser for Pairs<'a, Rule> {
 	fn parse(mut self) -> anyhow::Result<Vec<AstNode>> {
 		let program = self
-			.find_map(|pair| {
-				if let Rule::program = pair.as_rule() {
-					Some(pair)
-				} else {
-					None
-				}
-			})
+			.find(|pair| pair.as_rule() == Rule::program)
 			.ok_or_else(|| anyhow!("Expected `program` rule"))?;
 
 		Ok(program

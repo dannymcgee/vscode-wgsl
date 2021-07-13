@@ -95,15 +95,7 @@ trait PrettyDebug {
 
 impl<'a> IntoSymbols for Pairs<'a, Rule> {
 	fn into_symbols(mut self) -> Vec<DocumentSymbol> {
-		let program = self
-			.find_map(|pair| {
-				if let Rule::program = pair.as_rule() {
-					Some(pair)
-				} else {
-					None
-				}
-			})
-			.unwrap();
+		let program = self.find(|pair| pair.as_rule() == Rule::program).unwrap();
 
 		program
 			.into_inner()
