@@ -466,7 +466,17 @@ fn frag(in: VertexOutput) -> [[location(0)]] vec4<f32> {
 	}
 }
 
-fn assert_ok(result: Result) {
+#[test]
+fn ast_global_var_decl() {
+	let result = parse_ast(
+		"[[group(0), binding(0)]]
+		var<storage, read_write> pbuf: PositionsBuffer;",
+	);
+
+	assert!(result.is_ok());
+}
+
+fn assert_ok(result: Result<Pairs<Rule>>) {
 	if let Err(err) = result {
 		println!("{}", err);
 		panic!();
