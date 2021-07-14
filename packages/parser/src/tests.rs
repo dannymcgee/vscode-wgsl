@@ -468,12 +468,54 @@ fn frag(in: VertexOutput) -> [[location(0)]] vec4<f32> {
 
 #[test]
 fn ast_global_var_decl() {
-	let result = parse_ast(
-		"[[group(0), binding(0)]]
-		var<storage, read_write> pbuf: PositionsBuffer;",
-	);
+	let results = [
+		parse_ast(
+			"[[group(0), binding(0)]]
+			var<storage, read_write> pbuf: PositionsBuffer;",
+		),
+		parse_ast("[[location(0)]] var position: vec3<f32> = vec3<f32>(1.0, 0.5, 0.333);"),
+	];
 
+	for result in results {
+		assert!(result.is_ok());
+	}
+}
+
+#[test]
+fn ast_global_const_decl() {
+	let result = parse_ast("[[override(0)]] let has_point_light: bool = true;");
 	assert!(result.is_ok());
+}
+
+#[test]
+fn ast_struct_decl() {
+	let results = [
+		parse_ast(
+			"struct Data {
+				a: i32;
+				b: vec2<f32>;
+			};",
+		),
+		parse_ast(
+			"[[block]]
+			struct Light {
+				position: vec3<f32>;
+				color: vec3<f32>;
+			};",
+		),
+		parse_ast(
+			"struct VertexOutput {
+				[[builtin(position)]] clip_position: vec4<f32>;
+				[[location(0)]] tex_coords: vec2<f32>;
+				[[location(1)]] world_normal: vec3<f32>;
+				[[location(2)]] world_position: vec3<f32>;
+			};",
+		),
+	];
+
+	for result in results {
+		println!("{:#?}", result.unwrap());
+	}
 }
 
 fn assert_ok(result: Result<Pairs<Rule>>) {

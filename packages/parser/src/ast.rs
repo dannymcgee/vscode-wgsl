@@ -259,7 +259,7 @@ pub struct BinaryExpr {
 #[derive(Builder, Clone, Debug)]
 pub struct TypeCtorExpr {
 	ty: Box<TypeDecl>,
-	args: Vec<Expr>,
+	args: Vec<PrimaryExpr>,
 	range: Range,
 }
 
