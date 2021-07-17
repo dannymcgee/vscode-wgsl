@@ -113,16 +113,16 @@ pub enum Decl {
 }
 
 impl Decl {
-	pub fn ident(&self) -> Token {
+	pub fn ident(&self) -> &Token {
 		use Decl::*;
 
 		match self {
-			Var(inner) | Const(inner) => inner.name.clone(),
-			TypeAlias(inner) => inner.name.clone(),
-			Struct(inner) => inner.name.clone(),
-			Field(inner) => inner.name.clone(),
-			Function(inner) => inner.name.clone(),
-			Param(inner) => inner.name.clone(),
+			Var(ref inner) | Const(ref inner) => &inner.name,
+			TypeAlias(ref inner) => &inner.name,
+			Struct(ref inner) => &inner.name,
+			Field(ref inner) => &inner.name,
+			Function(ref inner) => &inner.name,
+			Param(ref inner) => &inner.name,
 		}
 	}
 }
