@@ -8,6 +8,7 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0"
 derive_builder = "0.10"
+itertools = "0.10"
 lsp-types = "0.89"
 pest = "2.1"
 pest_derive = "2.1"
