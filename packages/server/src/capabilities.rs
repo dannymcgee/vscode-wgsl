@@ -1,9 +1,11 @@
 use lsp_types::{
 	DocumentSymbolOptions, HoverProviderCapability, OneOf, SemanticTokensFullOptions,
-	SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities,
-	ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, WorkDoneProgressOptions,
+	SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities,
+	TextDocumentSyncCapability, TextDocumentSyncKind, WorkDoneProgressOptions,
 };
 use serde_json as json;
+
+use crate::semtok;
 
 pub fn define() -> json::Value {
 	json::to_value(&ServerCapabilities {
@@ -12,10 +14,7 @@ pub fn define() -> json::Value {
 			SemanticTokensOptions {
 				full: Some(SemanticTokensFullOptions::Bool(true)),
 				range: None,
-				legend: SemanticTokensLegend {
-					token_types: vec![],     // TODO
-					token_modifiers: vec![], // TODO
-				},
+				legend: semtok::legend(),
 				..Default::default()
 			},
 		)),
