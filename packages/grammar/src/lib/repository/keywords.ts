@@ -16,19 +16,19 @@ export const keyword: TMGrammarScope = {
 		},
 		{
 			match: /\b(vec[234])\b/,
-			name: "entity.name.type.struct.wgsl",
+			name: "entity.name.type.wgsl",
 		},
 		{
 			match: /\b(mat[234]x[234])\b/,
-			name: "entity.name.type.struct.wgsl",
+			name: "entity.name.type.wgsl",
 		},
 		{
 			match: /\b(texture_[23]d)\b/,
-			name: "entity.name.type.struct.wgsl",
+			name: "entity.name.type.wgsl",
 		},
 		{
 			match: /\b(sampler)\b/,
-			name: "entity.name.type.struct.wgsl",
+			name: "entity.name.type.wgsl",
 		},
 	],
 };
