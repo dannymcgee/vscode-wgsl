@@ -22,6 +22,7 @@ pub fn define() -> json::Value {
 			label: None,
 			work_done_progress_options: WorkDoneProgressOptions::default(),
 		})),
+		definition_provider: Some(OneOf::Left(true)),
 		text_document_sync: Some(TextDocumentSyncCapability::Kind(
 			TextDocumentSyncKind::Incremental,
 		)),

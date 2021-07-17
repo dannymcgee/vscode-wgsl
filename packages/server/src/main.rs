@@ -3,18 +3,19 @@ use lsp_types::{
 	notification::{
 		DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, Notification,
 	},
-	request::{DocumentSymbolRequest, HoverRequest, Request, SemanticTokensFullRequest},
+	request::{
+		DocumentSymbolRequest, GotoDefinition, HoverRequest, Request, SemanticTokensFullRequest,
+	},
 	DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
 	InitializeParams,
 };
 use serde_json as json;
 
-use crate::documents::Documents;
-
 #[macro_use]
 extern crate lazy_static;
 
 mod capabilities;
+mod definition;
 mod docsym;
 mod documents;
 mod hover;
@@ -53,6 +54,7 @@ fn main_loop(cx: &Connection, params: json::Value) -> Result<(), Error> {
 					HoverRequest::METHOD => hover::handle(req, tx.clone()),
 					SemanticTokensFullRequest::METHOD => semtok::handle(req, tx.clone()),
 					DocumentSymbolRequest::METHOD => docsym::handle(req, tx.clone()),
+					GotoDefinition::METHOD => definition::handle(req, tx.clone()),
 					_ => {}
 				}
 			}
