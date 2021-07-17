@@ -1,168 +1,276 @@
-use std::{
-	collections::HashMap,
-	sync::{Arc, RwLock},
-	thread,
-	time::Duration,
-};
+use std::{collections::HashMap, slice::Iter, sync::Arc};
 
 use anyhow::{anyhow, Result};
-use crossbeam_channel::{self as chan, Receiver, Sender, TryRecvError};
-use lsp_types::{DidChangeTextDocumentParams, Url};
+use dashmap::DashMap;
+use lsp_types::{DidChangeTextDocumentParams, DidOpenTextDocumentParams, Range, Url};
+use parser::{
+	ast::{Decl, Stmt, Token},
+	FlatTokens, GetRange, IsWithin, ParentGranularity, ParentOfRange,
+};
 use ropey::Rope;
 
 lazy_static! {
-	static ref DOCS: Documents = Documents::default();
+	static ref DOCS: Arc<DashMap<Url, Document>> = Arc::new(DashMap::default());
 }
 
-type DocumentReader = (Sender<()>, Receiver<String>);
-type DocumentWriter = (
-	Sender<()>,
-	Sender<DidChangeTextDocumentParams>,
-	Receiver<String>,
-);
+pub fn open(params: &DidOpenTextDocumentParams) -> Result<()> {
+	let document = Document::new(&params.text_document.text)?;
+	DOCS.insert(params.text_document.uri.clone(), document);
 
-#[derive(Debug, Default)]
-pub struct Documents {
-	store: Arc<RwLock<HashMap<Url, DocumentWriter>>>,
+	Ok(())
 }
 
-unsafe impl Send for Documents {}
-unsafe impl Sync for Documents {}
-
-impl Clone for Documents {
-	fn clone(&self) -> Self {
-		Self {
-			store: Arc::clone(&self.store),
-		}
-	}
+pub fn close(uri: &Url) {
+	DOCS.remove(uri);
 }
 
-impl Documents {
-	pub fn new() -> Self {
-		Self::default()
-	}
+#[allow(dead_code)]
+pub fn read(uri: &Url) -> Option<String> {
+	DOCS.get(uri).map(|entry| entry.value().read())
+}
 
-	pub fn open(&self, uri: &Url, content: String) {
-		let (event_writer, event_reader) = chan::unbounded();
-		let mut doc = Document::new(event_reader, content);
-		let (read_requester, update_receiver) = doc.reader();
-		let mut store = self.store.write().unwrap();
+pub fn parse(uri: &Url) -> Option<Arc<Vec<Decl>>> {
+	DOCS.get(uri).map(|entry| entry.value().parse())
+}
 
-		store.insert(uri.clone(), (read_requester, event_writer, update_receiver));
-	}
+pub fn scopes(uri: &Url) -> Option<Arc<Scopes>> {
+	DOCS.get(uri).map(|entry| entry.value().scopes())
+}
 
-	pub fn close(&self, _: &Url) {
-		todo!()
-	}
+pub fn tokens(uri: &Url) -> Option<Arc<Vec<Token>>> {
+	DOCS.get(uri).map(|entry| entry.value().tokens())
+}
 
-	pub fn read(&self, uri: &Url) -> Result<String> {
-		let response = if let Some((tx, _, rx)) = self.store.read().unwrap().get(uri) {
-			tx.send(())?;
-			rx.recv().map_err(|err| anyhow!("{}", err))
-		} else {
-			Err(anyhow!("No entry found for uri {:?}", uri))
-		};
+pub fn update(params: &DidChangeTextDocumentParams) -> Result<()> {
+	if let Some(mut doc) = DOCS.get_mut(&params.text_document.uri) {
+		doc.value_mut().update(&params)?;
 
-		response
-	}
-
-	pub fn update(&self, params: DidChangeTextDocumentParams) -> Result<()> {
-		eprintln!("{:#?}", params);
-
-		if let Some((_, tx, _)) = self.store.read().unwrap().get(&params.text_document.uri) {
-			tx.send(params).map_err(|err| anyhow!("{}", err))
-		} else {
-			Err(anyhow!(
-				"No entry found for uri {:?}",
-				params.text_document.uri
-			))
-		}
+		Ok(())
+	} else {
+		Err(anyhow!(
+			"No entry found for uri {:?}",
+			params.text_document.uri
+		))
 	}
 }
 
 #[derive(Debug)]
 struct Document {
-	content: Arc<RwLock<Rope>>,
-	update_events: Receiver<DidChangeTextDocumentParams>,
-	read_requests: Option<Receiver<()>>,
-	updates: Option<Sender<String>>,
+	text: Rope,
+	ast: Arc<Vec<Decl>>,
+	scopes: Arc<Scopes>,
+	tokens: Arc<Vec<Token>>,
 }
 
-unsafe impl Send for Document {}
-unsafe impl Sync for Document {}
-
 impl Document {
-	fn new(event_reader: Receiver<DidChangeTextDocumentParams>, content: String) -> Self {
-		Self {
-			content: Arc::new(RwLock::new(content.into())),
-			update_events: event_reader,
-			read_requests: None,
-			updates: None,
+	fn new(input: &str) -> Result<Self> {
+		let text: Rope = input.into();
+		let ast = Arc::new(parser::parse_ast(input)?);
+		let scopes = Arc::new(Scopes::from(ast.clone()));
+
+		let mut tokens = vec![];
+		ast.flat_tokens(&mut tokens);
+
+		let tokens = Arc::new(tokens);
+
+		Ok(Self {
+			text,
+			ast,
+			scopes,
+			tokens,
+		})
+	}
+
+	fn read(&self) -> String {
+		self.text.clone().into()
+	}
+
+	fn parse(&self) -> Arc<Vec<Decl>> {
+		Arc::clone(&self.ast)
+	}
+
+	fn scopes(&self) -> Arc<Scopes> {
+		Arc::clone(&self.scopes)
+	}
+
+	fn tokens(&self) -> Arc<Vec<Token>> {
+		Arc::clone(&self.tokens)
+	}
+
+	fn update(&mut self, params: &DidChangeTextDocumentParams) -> Result<()> {
+		for update in &params.content_changes {
+			let range = update.range.unwrap();
+
+			let start_line = self.text.line_to_char(range.start.line as usize);
+			let edit_start = start_line + range.start.character as usize;
+
+			let end_line = self.text.line_to_char(range.end.line as usize);
+			let edit_end = end_line + range.end.character as usize;
+
+			if edit_end - edit_start > 0 {
+				self.text.remove(edit_start..edit_end);
+			}
+			self.text.insert(edit_start, &update.text);
 		}
+
+		// TODO: Incremental parsing
+		for range in params
+			.content_changes
+			.iter()
+			.filter_map(|update| update.range)
+		{
+			if let Some(affected_node) = self.ast.parent_of(&range, ParentGranularity::Expr) {
+				eprintln!("Changed node: {:#?}", affected_node);
+			}
+		}
+		self.ast = Arc::new(parser::parse_ast(&self.text.to_string())?);
+
+		let mut tokens = vec![];
+		self.ast.flat_tokens(&mut tokens);
+
+		self.tokens = Arc::new(tokens);
+
+		Ok(())
 	}
+}
 
-	fn reader(&mut self) -> DocumentReader {
-		let (request_sender, request_receiver) = chan::unbounded();
-		let (update_writer, update_reader) = chan::unbounded();
+pub type Scope = HashMap<String, Arc<Decl>>;
 
-		self.read_requests = Some(request_receiver);
-		self.updates = Some(update_writer);
-		self.start_loop();
+// TODO: Consider moving this into the `parser` crate
+#[derive(Debug)]
+pub struct Scopes {
+	ast: Arc<Vec<Decl>>,
+	inner: Vec<(Range, Arc<Scope>)>,
+}
 
-		(request_sender, update_reader)
-	}
+impl Scopes {
+	pub fn find_decl(&self, token: &Token) -> Option<Arc<Decl>> {
+		use parser::{
+			ast::{Expr, PostfixExpr, PrimaryExpr},
+			AstNode,
+		};
 
-	fn start_loop(&self) {
-		let update_events = self.update_events.clone();
-		let read_requests = self.read_requests.as_ref().unwrap().clone();
-		let updates = self.updates.as_ref().unwrap().clone();
-		let content = self.content.clone();
+		let (name, token_range) = token.borrow_inner();
+		let parent = self
+			.ast
+			.parent_of(&token_range, ParentGranularity::Expr)
+			.unwrap();
 
-		thread::spawn(move || loop {
-			// Check for update events
-			match update_events.try_recv() {
-				Ok(event) => {
-					for update in event.content_changes {
-						let mut writable = content.write().unwrap();
-						let range = update.range.unwrap();
+		if let AstNode::Expr(Expr::Singular(ref expr)) = &parent {
+			if let Some(PostfixExpr::Dot { ident, range, .. }) = &expr.postfix {
+				let (postfix_ident, _) = ident.borrow_inner();
 
-						let start_line = writable.line_to_char(range.start.line as usize);
-						let edit_start = start_line + range.start.character as usize;
+				if token_range.is_within(&range) && postfix_ident == name {
+					let var_name = if let PrimaryExpr::Identifier(ref token) = expr.expr {
+						token.borrow_inner().0
+					} else {
+						return None;
+					};
 
-						let end_line = writable.line_to_char(range.end.line as usize);
-						let edit_end = end_line + range.end.character as usize;
-
-						if edit_end - edit_start > 0 {
-							writable.remove(edit_start..edit_end);
+					let var_decl = self.inner.iter().find_map(|(scope_range, scope)| {
+						if range.is_within(scope_range) {
+							scope.get(var_name).map(|decl| Arc::clone(decl))
+						} else {
+							None
 						}
-						writable.insert(edit_start, &update.text);
+					})?;
+
+					let struct_name = match *var_decl.as_ref() {
+						Decl::Var(ref decl) | Decl::Const(ref decl) => {
+							if let Some(ref ty) = decl.type_decl {
+								ty.name.borrow_inner().0
+							} else {
+								return None;
+							}
+						}
+						Decl::Param(ref decl) => decl.type_decl.name.borrow_inner().0,
+						_ => return None,
+					};
+
+					if let Some(Decl::Struct(struct_decl)) = self
+						.ast
+						.iter()
+						.find(|decl| decl.ident().borrow_inner().0 == struct_name)
+					{
+						return struct_decl.body.iter().find_map(|field| {
+							if field.name.borrow_inner().0 == name {
+								Some(Arc::new(Decl::Field(field.clone()))) // TODO
+							} else {
+								None
+							}
+						});
+					} else {
+						return None;
 					}
 				}
-				Err(TryRecvError::Disconnected) => {
-					// TODO: close all channels and break loop
-				}
-				_ => {}
 			}
+		}
 
-			// Check for read requests
-			#[allow(clippy::redundant_pattern_matching)]
-			match read_requests.try_recv() {
-				Ok(_) => {
-					let readable = content.read().unwrap();
-					let update = readable.to_string();
+		self.inner.iter().find_map(|(scope_range, scope)| {
+			if token_range.is_within(scope_range) {
+				scope.get(name).map(|decl| Arc::clone(decl))
+			} else {
+				None
+			}
+		})
+	}
 
-					if let Err(_) = updates.send(update) {
-						// TODO: close all channels and break loop
+	pub fn iter(&self) -> Iter<'_, (Range, Arc<Scope>)> {
+		self.inner.iter()
+	}
+}
+
+impl From<Arc<Vec<Decl>>> for Scopes {
+	fn from(ast: Arc<Vec<Decl>>) -> Self {
+		if ast.is_empty() {
+			return Self {
+				ast: Arc::new(vec![]),
+				inner: vec![],
+			};
+		}
+
+		let mut scopes: Vec<(Range, Arc<Scope>)> = vec![];
+
+		let global_start = ast.first().unwrap().range().start;
+		let global_end = ast.last().unwrap().range().end;
+
+		let global_range = Range {
+			start: global_start,
+			end: global_end,
+		};
+
+		let mut global_scopes = HashMap::new();
+
+		for decl in ast.iter() {
+			let name = decl.ident().to_string();
+			global_scopes.insert(name, Arc::new(decl.clone())); // TODO
+		}
+		scopes.push((global_range, Arc::new(global_scopes)));
+
+		for decl in ast.iter() {
+			if let Decl::Function(inner) = decl {
+				let mut current_scopes = HashMap::new();
+				let range = inner.range;
+
+				for param in &inner.signature.params {
+					let name = param.name.to_string();
+					current_scopes.insert(name, Arc::new(Decl::Param(param.clone()))); // TODO
+				}
+
+				let (_, stmts) = &inner.body;
+				for stmt in stmts {
+					if let Stmt::Variable(var_decl) = stmt {
+						let name = var_decl.name.to_string();
+						current_scopes.insert(name, Arc::new(Decl::Var(var_decl.clone()))); // TODO
 					}
 				}
-				Err(TryRecvError::Disconnected) => {
-					// TODO: close all channels and break loop
-				}
-				_ => {}
-			}
 
-			// TODO: Sleep?
-			thread::sleep(Duration::from_millis(17));
-		});
+				scopes.push((range, Arc::new(current_scopes)));
+			}
+		}
+
+		scopes.reverse();
+
+		Self { ast, inner: scopes }
 	}
 }

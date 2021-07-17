@@ -8,6 +8,8 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0"
 crossbeam-channel = "*"
+dashmap = "4"
+itertools = "*"
 lazy_static = "1.4"
 lsp-server = "0.5"
 lsp-types = "0.89"
@@ -16,4 +18,3 @@ parser = { path = "../parser" }
 ropey = "1.3"
 serde_json = "1"
 serde = { version = "1", features = ["derive"] }
-urlencoding = "1.3"

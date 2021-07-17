@@ -36,13 +36,11 @@ fn main() -> Result<(), Error> {
 
 fn main_loop(cx: &Connection, params: json::Value) -> Result<(), Error> {
 	let _: InitializeParams = json::from_value(params).unwrap();
-	let documents = Documents::new();
 
 	let rx = cx.receiver.clone();
 	let tx = cx.sender.clone();
 
 	for msg in rx {
-		#[allow(unused_must_use)]
 		match msg {
 			Message::Request(req) => {
 				eprintln!("[Request] {}", req.method);
@@ -54,9 +52,7 @@ fn main_loop(cx: &Connection, params: json::Value) -> Result<(), Error> {
 				match &req.method[..] {
 					HoverRequest::METHOD => hover::handle(req, tx.clone()),
 					SemanticTokensFullRequest::METHOD => semtok::handle(req, tx.clone()),
-					DocumentSymbolRequest::METHOD => {
-						docsym::handle(req, documents.clone(), tx.clone())
-					}
+					DocumentSymbolRequest::METHOD => docsym::handle(req, tx.clone()),
 					_ => {}
 				}
 			}
@@ -72,21 +68,25 @@ fn main_loop(cx: &Connection, params: json::Value) -> Result<(), Error> {
 							.extract::<DidOpenTextDocumentParams>(DidOpenTextDocument::METHOD)
 							.unwrap();
 
-						documents.open(&params.text_document.uri, params.text_document.text);
+						if let Err(err) = documents::open(&params) {
+							eprintln!("Error opening document: {}", err);
+						}
 					}
 					DidChangeTextDocument::METHOD => {
 						let params = notif
 							.extract::<DidChangeTextDocumentParams>(DidChangeTextDocument::METHOD)
 							.unwrap();
 
-						documents.update(params);
+						if let Err(err) = documents::update(&params) {
+							eprintln!("Error updating document: {}", err);
+						}
 					}
 					DidCloseTextDocument::METHOD => {
 						let params = notif
 							.extract::<DidCloseTextDocumentParams>(DidCloseTextDocument::METHOD)
 							.unwrap();
 
-						documents.close(&params.text_document.uri);
+						documents::close(&params.text_document.uri);
 					}
 					_ => {}
 				}
