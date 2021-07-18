@@ -4,8 +4,8 @@ use anyhow::{anyhow, Result};
 use dashmap::DashMap;
 use lsp_types::{DidChangeTextDocumentParams, DidOpenTextDocumentParams, Range, Url};
 use parser::{
-	ast::{Decl, Stmt, Token},
-	FlatTokens, GetRange, IsWithin, ParentGranularity, ParentOfRange,
+	ast::{Decl, Expr, PostfixExpr, PrimaryExpr, Stmt, Token},
+	AstNode, FlatTokens, GetRange, IsWithin, ParentGranularity, ParentOfRange,
 };
 use ropey::Rope;
 
@@ -194,11 +194,6 @@ pub struct Scopes {
 
 impl Scopes {
 	pub fn find_decl(&self, token: &Token) -> Option<Arc<Decl>> {
-		use parser::{
-			ast::{Expr, PostfixExpr, PrimaryExpr},
-			AstNode,
-		};
-
 		let (name, token_range) = token.borrow_inner();
 		let parent = self
 			.ast
