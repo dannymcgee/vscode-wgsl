@@ -3,16 +3,16 @@ extern crate pest_derive;
 #[macro_use]
 extern crate derive_builder;
 
-use anyhow::anyhow;
 use lsp_types::{Position, Range};
 use pest::{
-	error::Error,
+	error::{Error, ErrorVariant},
 	iterators::{Pair, Pairs},
 	Parser as PestParser, Span,
 };
 use std::{result, time::Instant};
 
 pub mod ast;
+mod error;
 mod flat_tokens;
 mod range_utils;
 #[macro_use]
@@ -34,7 +34,7 @@ pub fn parse(input: &str) -> Result<Pairs<Rule>> {
 	Parser::parse(Rule::program, input)
 }
 
-pub fn parse_ast(input: &str) -> anyhow::Result<Vec<Decl>> {
+pub fn parse_ast(input: &str) -> Result<Vec<Decl>> {
 	let start = Instant::now();
 
 	let program = parse(input)?;
@@ -49,18 +49,18 @@ pub fn parse_ast(input: &str) -> anyhow::Result<Vec<Decl>> {
 	result
 }
 
-pub fn parse_stmt(input: &str) -> anyhow::Result<Stmt> {
+pub fn parse_stmt(input: &str) -> Result<Stmt> {
 	let mut stmt = Parser::parse(Rule::statement, input)?;
 	Ok(stmt.next().unwrap().parse_statement())
 }
 
-pub fn parse_expr(input: &str) -> anyhow::Result<Expr> {
+pub fn parse_expr(input: &str) -> Result<Expr> {
 	let mut expr = Parser::parse(Rule::expression, input)?;
 	Ok(expr.next().unwrap().parse_expression())
 }
 
 trait AstParser {
-	fn parse(self) -> anyhow::Result<Vec<Decl>>;
+	fn parse(self) -> Result<Vec<Decl>>;
 }
 
 trait AstNodeParser<'a> {
@@ -103,10 +103,17 @@ trait AstNodeParser<'a> {
 }
 
 impl<'a> AstParser for Pairs<'a, Rule> {
-	fn parse(mut self) -> anyhow::Result<Vec<Decl>> {
+	fn parse(mut self) -> Result<Vec<Decl>> {
 		let program = self
 			.find(|pair| pair.as_rule() == Rule::program)
-			.ok_or_else(|| anyhow!("Expected `program` rule"))?;
+			.ok_or_else(|| {
+				Error::new_from_span(
+					ErrorVariant::CustomError {
+						message: "Unable to find parser entry rule".into(),
+					},
+					Span::new("", 0, 0).unwrap(),
+				)
+			})?;
 
 		Ok(program
 			.into_inner()

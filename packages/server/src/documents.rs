@@ -9,13 +9,16 @@ use parser::{
 };
 use ropey::Rope;
 
+use crate::diagnostics::{self, ErrorKind};
+
 lazy_static! {
 	static ref DOCS: Arc<DashMap<Url, Document>> = Arc::new(DashMap::default());
 }
 
 pub fn open(params: &DidOpenTextDocumentParams) -> Result<()> {
-	let document = Document::new(&params.text_document.text)?;
-	DOCS.insert(params.text_document.uri.clone(), document);
+	let uri = &params.text_document.uri;
+	let document = Document::new(uri, &params.text_document.text)?;
+	DOCS.insert(uri.clone(), document);
 
 	Ok(())
 }
@@ -30,15 +33,15 @@ pub fn read(uri: &Url) -> Option<String> {
 }
 
 pub fn parse(uri: &Url) -> Option<Arc<Vec<Decl>>> {
-	DOCS.get(uri).map(|entry| entry.value().parse())
+	DOCS.get(uri).and_then(|entry| entry.value().parse())
 }
 
 pub fn scopes(uri: &Url) -> Option<Arc<Scopes>> {
-	DOCS.get(uri).map(|entry| entry.value().scopes())
+	DOCS.get(uri).and_then(|entry| entry.value().scopes())
 }
 
 pub fn tokens(uri: &Url) -> Option<Arc<Vec<Token>>> {
-	DOCS.get(uri).map(|entry| entry.value().tokens())
+	DOCS.get(uri).and_then(|entry| entry.value().tokens())
 }
 
 pub fn update(params: &DidChangeTextDocumentParams) -> Result<()> {
@@ -56,24 +59,43 @@ pub fn update(params: &DidChangeTextDocumentParams) -> Result<()> {
 
 #[derive(Debug)]
 struct Document {
+	uri: Url,
 	text: Rope,
-	ast: Arc<Vec<Decl>>,
-	scopes: Arc<Scopes>,
-	tokens: Arc<Vec<Token>>,
+	ast: Option<Arc<Vec<Decl>>>,
+	scopes: Option<Arc<Scopes>>,
+	tokens: Option<Arc<Vec<Token>>>,
 }
 
 impl Document {
-	fn new(input: &str) -> Result<Self> {
+	fn new(uri: &Url, input: &str) -> Result<Self> {
 		let text: Rope = input.into();
-		let ast = Arc::new(parser::parse_ast(input)?);
-		let scopes = Arc::new(Scopes::from(ast.clone()));
+		let ast = match parser::parse_ast(input) {
+			Ok(ast) => {
+				diagnostics::clear_errors(uri, Some(ErrorKind::ParseError));
+				Some(Arc::new(ast))
+			}
+			Err(err) => {
+				diagnostics::clear_errors(uri, Some(ErrorKind::ParseError));
+				diagnostics::report_error(uri, err, ErrorKind::ParseError);
 
-		let mut tokens = vec![];
-		ast.flat_tokens(&mut tokens);
+				None
+			}
+		};
 
-		let tokens = Arc::new(tokens);
+		let scopes = ast.as_ref().map(|ast| Arc::new(Scopes::from(ast.clone())));
+		let tokens = ast.as_ref().map(|ast| {
+			let mut tokens = vec![];
+			ast.flat_tokens(&mut tokens);
+
+			Arc::new(tokens)
+		});
+
+		if ast.is_some() {
+			diagnostics::validate(uri.clone(), input.into());
+		}
 
 		Ok(Self {
+			uri: uri.clone(),
 			text,
 			ast,
 			scopes,
@@ -85,16 +107,16 @@ impl Document {
 		self.text.clone().into()
 	}
 
-	fn parse(&self) -> Arc<Vec<Decl>> {
-		Arc::clone(&self.ast)
+	fn parse(&self) -> Option<Arc<Vec<Decl>>> {
+		self.ast.as_ref().map(|ast| Arc::clone(&ast))
 	}
 
-	fn scopes(&self) -> Arc<Scopes> {
-		Arc::clone(&self.scopes)
+	fn scopes(&self) -> Option<Arc<Scopes>> {
+		self.scopes.as_ref().map(|scopes| Arc::clone(&scopes))
 	}
 
-	fn tokens(&self) -> Arc<Vec<Token>> {
-		Arc::clone(&self.tokens)
+	fn tokens(&self) -> Option<Arc<Vec<Token>>> {
+		self.tokens.as_ref().map(|tokens| Arc::clone(&tokens))
 	}
 
 	fn update(&mut self, params: &DidChangeTextDocumentParams) -> Result<()> {
@@ -119,16 +141,43 @@ impl Document {
 			.iter()
 			.filter_map(|update| update.range)
 		{
-			if let Some(affected_node) = self.ast.parent_of(&range, ParentGranularity::Expr) {
+			if let Some(affected_node) = self
+				.ast
+				.as_ref()
+				.map(|ast| ast.parent_of(&range, ParentGranularity::Expr))
+			{
 				eprintln!("Changed node: {:#?}", affected_node);
 			}
 		}
-		self.ast = Arc::new(parser::parse_ast(&self.text.to_string())?);
 
-		let mut tokens = vec![];
-		self.ast.flat_tokens(&mut tokens);
+		self.ast = match parser::parse_ast(&self.text.to_string()) {
+			Ok(ast) => {
+				diagnostics::clear_errors(&self.uri, Some(ErrorKind::ParseError));
+				Some(Arc::new(ast))
+			}
+			Err(err) => {
+				diagnostics::clear_errors(&self.uri, Some(ErrorKind::ParseError));
+				diagnostics::report_error(&self.uri, err, ErrorKind::ParseError);
 
-		self.tokens = Arc::new(tokens);
+				None
+			}
+		};
+
+		self.scopes = self
+			.ast
+			.as_ref()
+			.map(|ast| Arc::new(Scopes::from(ast.clone())));
+
+		self.tokens = self.ast.as_ref().map(|ast| {
+			let mut tokens = vec![];
+			ast.flat_tokens(&mut tokens);
+
+			Arc::new(tokens)
+		});
+
+		if self.ast.is_some() {
+			diagnostics::validate(self.uri.clone(), self.text.to_string());
+		}
 
 		Ok(())
 	}

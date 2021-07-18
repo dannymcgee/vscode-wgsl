@@ -16,6 +16,7 @@ extern crate lazy_static;
 
 mod capabilities;
 mod definition;
+mod diagnostics;
 mod docsym;
 mod documents;
 mod hover;
@@ -28,6 +29,7 @@ fn main() -> Result<(), Error> {
 	let capabilities = capabilities::define();
 	let init_params = cx.initialize(capabilities)?;
 
+	diagnostics::bootstrap(cx.sender.clone());
 	main_loop(&cx, init_params)?;
 
 	io_threads.join()?;

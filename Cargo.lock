@@ -523,6 +523,7 @@ dependencies = [
  "lsp-types",
  "naga",
  "parser",
+ "pest",
  "ropey",
  "serde",
  "serde_json",
