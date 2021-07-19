@@ -135,21 +135,6 @@ impl Document {
 			self.text.insert(edit_start, &update.text);
 		}
 
-		// TODO: Incremental parsing
-		for range in params
-			.content_changes
-			.iter()
-			.filter_map(|update| update.range)
-		{
-			if let Some(affected_node) = self
-				.ast
-				.as_ref()
-				.map(|ast| ast.parent_of(&range, ParentGranularity::Expr))
-			{
-				eprintln!("Changed node: {:#?}", affected_node);
-			}
-		}
-
 		self.ast = match parser::parse_ast(&self.text.to_string()) {
 			Ok(ast) => {
 				diagnostics::clear_errors(&self.uri, Some(ErrorKind::ParseError));

@@ -56,7 +56,9 @@
 			"targets": {
 				"build": {
 					"executor": "@nxrs/cargo:build",
-					"options": {},
+					"options": {
+						"release": true
+					},
 					"configurations": {
 						"production": {
 							"release": true
@@ -79,7 +81,8 @@
 				"build": {
 					"executor": "@nxrs/cargo:build",
 					"options": {
-						"outDir": "dist/vscode-wgsl"
+						"outDir": "dist/vscode-wgsl",
+						"release": true
 					},
 					"configurations": {
 						"production": {
