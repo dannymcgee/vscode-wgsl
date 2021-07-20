@@ -86,7 +86,7 @@ pub fn validate(uri: Url, content: String) {
 					Ok(_) => self::clear_errors(&uri, Some(ErrorKind::NagaValidationError)),
 					Err(err) => {
 						self::clear_errors(&uri, Some(ErrorKind::NagaValidationError));
-						eprintln!("naga validation error: {:#?}", err); // TODO
+						self::report_error(&uri, err, ErrorKind::NagaValidationError);
 					}
 				}
 			}
@@ -105,6 +105,7 @@ where
 {
 	let diag = match kind {
 		ErrorKind::ParseError => err.into_diagnostic(kind, None, None),
+		ErrorKind::NagaValidationError => err.into_diagnostic(kind, Some(uri), None),
 		ErrorKind::NagaParseError => {
 			let src = match documents::read(uri) {
 				Some(src) => src,
@@ -112,7 +113,6 @@ where
 			};
 			err.into_diagnostic(kind, Some(uri), Some(&src))
 		}
-		ErrorKind::NagaValidationError => todo!(),
 	};
 
 	if let Some(mut entry) = COLLECTION.get_mut(uri) {
@@ -243,6 +243,7 @@ pub trait IntoDiagnostic {
 	fn into_diagnostic(self, kind: ErrorKind, uri: Option<&Url>, src: Option<&str>) -> Diagnostic;
 }
 
+// NOTE: This entire impl was basically copy/pasted from pest's source
 impl IntoDiagnostic for pest::error::Error<parser::Rule> {
 	fn into_diagnostic(self, kind: ErrorKind, _: Option<&Url>, _: Option<&str>) -> Diagnostic {
 		use pest::error::ErrorVariant::*;
@@ -281,7 +282,7 @@ impl IntoDiagnostic for pest::error::Error<parser::Rule> {
 		DiagnosticBuilder::new(kind)
 			.range(self.line_col.as_range())
 			.severity(DiagnosticSeverity::Error)
-			.message(message)
+			.message(format!("ParseError: {}", message))
 			.build()
 	}
 }
@@ -329,8 +330,105 @@ impl IntoDiagnostic for wgsl::ParseError {
 		DiagnosticBuilder::new(kind)
 			.range(full_range)
 			.severity(DiagnosticSeverity::Error)
-			.message(self)
+			.message(format!("CompileError: {}", self))
 			.build()
+	}
+}
+
+macro_rules! lookup_token {
+	($scopes:ident, $variant:ident($name:ident)) => {
+		$scopes.iter().rev().find_map(|(_, map)| {
+			map.get($name).and_then(|value| match value.as_ref() {
+				Decl::$variant(ref decl) => Some(decl.name.clone()),
+				_ => None,
+			})
+		})
+	};
+}
+
+impl IntoDiagnostic for naga::valid::ValidationError {
+	fn into_diagnostic(self, kind: ErrorKind, uri: Option<&Url>, _: Option<&str>) -> Diagnostic {
+		use naga::valid::ValidationError::*;
+
+		let first_line = Range {
+			start: Position {
+				line: 0,
+				character: 0,
+			},
+			end: Position {
+				line: 1,
+				character: 0,
+			},
+		};
+
+		let uri = uri.expect("uri must be provided for naga ParseError");
+		let scopes = match documents::scopes(uri) {
+			Some(scopes) => scopes,
+			None => {
+				return DiagnosticBuilder::new(kind)
+					.range(first_line)
+					.severity(DiagnosticSeverity::Error)
+					.message(format!("ValidationError: {}", self))
+					.build()
+			}
+		};
+
+		let (token, message) = match &self {
+			Layouter(_) => (None, self.to_string()),
+			Type { error, .. } => {
+				let token = None; // TODO
+				eprintln!("{:#?}", error);
+				(token, error.to_string())
+			}
+			Constant { name, error, .. } => {
+				let token = lookup_token!(scopes, Const(name));
+				eprintln!("{:#?}", error);
+				(token, error.to_string())
+			}
+			GlobalVariable { name, error, .. } => {
+				let token = lookup_token!(scopes, Var(name));
+				eprintln!("{:#?}", error);
+				(token, error.to_string())
+			}
+			Function { name, error, .. } => {
+				let token = lookup_token!(scopes, Function(name));
+				eprintln!("{:#?}", error);
+				(token, error.to_string())
+			}
+			EntryPoint { name, error, .. } => {
+				let token = lookup_token!(scopes, Function(name));
+				(token, error.to_message())
+			}
+			Corrupted => (None, self.to_string()),
+		};
+
+		// FIXME: Use a real range once https://github.com/gfx-rs/naga/issues/358 is fixed upstream
+		let range = match token {
+			Some(token) => token.range(),
+			None => first_line,
+		};
+
+		DiagnosticBuilder::new(kind)
+			.range(range)
+			.severity(DiagnosticSeverity::Error)
+			.message(format!("ValidationError: {}", message))
+			.build()
+	}
+}
+
+trait ToMessage {
+	fn to_message(&self) -> String;
+}
+
+impl ToMessage for EntryPointError {
+	fn to_message(&self) -> String {
+		use EntryPointError::*;
+
+		match self {
+			Argument(_, err) | Result(err) => err.to_string(),
+			Function(err) => err.to_string(),
+			_ => self.to_string(),
+		}
 	}
 }
 
