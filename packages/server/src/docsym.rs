@@ -1,11 +1,13 @@
 use std::{sync::Arc, thread};
 
-use crossbeam_channel::Sender;
+use crossbeam::channel::Sender;
+use dashmap::DashMap;
 use itertools::Itertools;
-use lsp_server::{Message, Response, ResponseError};
+use lsp_server::{Message, Response};
 use lsp_types::{
 	request::{DocumentSymbolRequest, Request},
 	DocumentSymbol, DocumentSymbolParams, DocumentSymbolResponse, Range, SymbolKind, SymbolTag,
+	Url,
 };
 use parser::{
 	ast::{Decl, FunctionDecl, FunctionSignature, Pretty, StructDecl, StructField, VarDecl},
@@ -15,35 +17,38 @@ use serde_json as json;
 
 use crate::documents;
 
+lazy_static! {
+	static ref CACHE: Arc<DashMap<Url, Arc<DocumentSymbolResponse>>> = Arc::new(DashMap::default());
+}
+
 pub fn handle(req: lsp_server::Request, tx: Sender<Message>) {
 	thread::spawn(move || {
 		let (id, params) = req
 			.extract::<DocumentSymbolParams>(DocumentSymbolRequest::METHOD)
 			.unwrap();
 
-		#[allow(unused_must_use)]
-		match documents::parse(&params.text_document.uri) {
+		let response = match documents::parse(&params.text_document.uri) {
 			Some(ast) => {
-				let response = DocumentSymbolResponse::Nested(ast.into_symbols());
+				let symbols = ast.into_symbols();
+				let response = Arc::new(DocumentSymbolResponse::Nested(symbols));
+				CACHE.insert(params.text_document.uri, response.clone());
 
-				tx.send(Message::Response(Response {
-					id,
-					result: Some(json::to_value(&response).unwrap()),
-					error: None,
-				}));
+				response
 			}
-			None => {
-				tx.send(Message::Response(Response {
-					id,
-					result: None,
-					error: Some(ResponseError {
-						code: 1,
-						message: "Document not found for URI".into(),
-						data: None,
-					}),
-				}));
-			}
-		}
+			// If there's some syntax error in the file, we won't be able to parse it.
+			// In this case, just retrieve the cached result if any, or an empty vec otherwise.
+			None => match CACHE.get(&params.text_document.uri) {
+				Some(cached_entry) => Arc::clone(cached_entry.value()),
+				None => Arc::new(DocumentSymbolResponse::Nested(vec![])),
+			},
+		};
+		let result = Some(json::to_value(response.as_ref()).unwrap());
+
+		let _ = tx.send(Message::Response(Response {
+			id,
+			result,
+			error: None,
+		}));
 	});
 }
 

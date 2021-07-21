@@ -29,7 +29,9 @@ fn main() -> Result<(), Error> {
 	let capabilities = capabilities::define();
 	let init_params = cx.initialize(capabilities)?;
 
-	diagnostics::bootstrap(cx.sender.clone());
+	unsafe {
+		diagnostics::bootstrap(cx.sender.clone());
+	}
 	main_loop(&cx, init_params)?;
 
 	io_threads.join()?;
@@ -72,18 +74,14 @@ fn main_loop(cx: &Connection, params: json::Value) -> Result<(), Error> {
 							.extract::<DidOpenTextDocumentParams>(DidOpenTextDocument::METHOD)
 							.unwrap();
 
-						if let Err(err) = documents::open(&params) {
-							eprintln!("Error opening document: {}", err);
-						}
+						documents::open(&params)?;
 					}
 					DidChangeTextDocument::METHOD => {
 						let params = notif
 							.extract::<DidChangeTextDocumentParams>(DidChangeTextDocument::METHOD)
 							.unwrap();
 
-						if let Err(err) = documents::update(&params) {
-							eprintln!("Error updating document: {}", err);
-						}
+						documents::update(&params)?;
 					}
 					DidCloseTextDocument::METHOD => {
 						let params = notif

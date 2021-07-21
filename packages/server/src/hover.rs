@@ -1,6 +1,6 @@
 use std::thread;
 
-use crossbeam_channel::Sender;
+use crossbeam::channel::Sender;
 use lsp_server::{Message, Response};
 use lsp_types::{
 	request::{HoverRequest, Request},
@@ -55,13 +55,10 @@ pub fn handle(req: lsp_server::Request, tx: Sender<Message>) {
 				)
 			});
 
-		#[allow(unused_must_use)]
-		{
-			tx.send(Message::Response(Response {
-				id,
-				result,
-				error: None,
-			}));
-		}
+		let _ = tx.send(Message::Response(Response {
+			id,
+			result,
+			error: None,
+		}));
 	});
 }

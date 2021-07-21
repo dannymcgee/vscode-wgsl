@@ -1,6 +1,6 @@
 use std::thread;
 
-use crossbeam_channel::Sender;
+use crossbeam::channel::Sender;
 use lsp_server::{Message, Response};
 use lsp_types::{
 	request::{GotoDefinition, Request},
@@ -45,13 +45,10 @@ pub fn handle(req: lsp_server::Request, tx: Sender<Message>) {
 			})
 			.or_else(|| Some(json::to_value(&GotoDefinitionResponse::Array(vec![])).unwrap()));
 
-		#[allow(unused_must_use)]
-		{
-			tx.send(Message::Response(Response {
-				id,
-				result,
-				error: None,
-			}));
-		}
+		let _ = tx.send(Message::Response(Response {
+			id,
+			result,
+			error: None,
+		}));
 	});
 }

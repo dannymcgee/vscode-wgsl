@@ -1,11 +1,12 @@
 use std::{sync::Arc, thread};
 
-use crossbeam_channel::Sender;
-use lsp_server::{Message, RequestId, Response};
+use crossbeam::channel::Sender;
+use itertools::Itertools;
+use lsp_server::{Message, Response};
 use lsp_types::{
 	request::{Request, SemanticTokensFullRequest},
 	SemanticToken, SemanticTokenModifier as TMod, SemanticTokenType as TType, SemanticTokens,
-	SemanticTokensLegend, SemanticTokensParams,
+	SemanticTokensLegend, SemanticTokensParams, Url,
 };
 use parser::{ast::Token, GetRange, IsWithin};
 use serde_json as json;
@@ -18,50 +19,58 @@ pub fn handle(req: lsp_server::Request, tx: Sender<Message>) {
 			.extract::<SemanticTokensParams>(SemanticTokensFullRequest::METHOD)
 			.unwrap();
 
-		let tokens = match documents::tokens(&params.text_document.uri) {
-			Some(tokens) => tokens,
-			None => {
-				let _ = tx.send(null_result(id));
-				return;
-			}
-		};
-		let scopes = match documents::scopes(&params.text_document.uri) {
-			Some(scopes) => scopes,
-			None => {
-				let _ = tx.send(null_result(id));
-				return;
-			}
-		};
+		let tokens = get_semantic_tokens(params.text_document.uri);
+		let result = Some(json::to_value(&tokens).unwrap());
 
-		let deltas = get_deltas(tokens.clone());
-		let data = tokens
-			.iter()
-			.enumerate()
-			.map(|(idx, token)| {
-				let (token_type, token_modifiers_bitset) = scopes.get_token_type(&token);
-				let (text, _) = token.borrow_inner();
-
-				SemanticToken {
-					delta_line: deltas[idx].delta_line,
-					delta_start: deltas[idx].delta_start_char,
-					length: text.len() as u32,
-					token_type: token_type as u32,
-					token_modifiers_bitset,
-				}
-			})
-			.collect::<Vec<_>>();
-
-		let result = SemanticTokens {
-			data,
-			result_id: None,
-		};
-
-		let _ = tx.send(Message::Response(Response {
+		tx.send(Message::Response(Response {
 			id,
-			result: Some(json::to_value(&result).unwrap()),
+			result,
 			error: None,
-		}));
+		}))
+		.unwrap();
 	});
+}
+
+fn get_semantic_tokens(uri: Url) -> SemanticTokens {
+	let tokens = match documents::tokens(&uri) {
+		Some(tokens) => tokens,
+		None => return empty_result(),
+	};
+
+	let scopes = match documents::scopes(&uri) {
+		Some(scopes) => scopes,
+		None => return empty_result(),
+	};
+
+	let deltas = get_deltas(tokens.clone());
+	let data = tokens
+		.iter()
+		.enumerate()
+		.map(|(idx, token)| {
+			let (token_type, token_modifiers_bitset) = scopes.get_token_type(&token);
+			let (text, _) = token.borrow_inner();
+
+			SemanticToken {
+				delta_line: deltas[idx].delta_line,
+				delta_start: deltas[idx].delta_start_char,
+				length: text.len() as u32,
+				token_type: token_type as u32,
+				token_modifiers_bitset,
+			}
+		})
+		.collect_vec();
+
+	SemanticTokens {
+		data,
+		result_id: None,
+	}
+}
+
+fn empty_result() -> SemanticTokens {
+	SemanticTokens {
+		data: vec![],
+		result_id: None,
+	}
 }
 
 #[derive(Debug)]
@@ -219,14 +228,4 @@ impl GetTokenType for Scopes {
 			_ => (lexical_token, 0),
 		}
 	}
-}
-
-fn null_result(id: RequestId) -> Message {
-	let result = SemanticTokens::default();
-
-	Message::Response(Response {
-		id,
-		result: Some(json::to_value(&result).unwrap()),
-		error: None,
-	})
 }

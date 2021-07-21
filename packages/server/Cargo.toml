@@ -7,7 +7,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0"
-crossbeam-channel = "*"
+crossbeam = "0.8"
 dashmap = "4"
 itertools = "*"
 lazy_static = "1.4"

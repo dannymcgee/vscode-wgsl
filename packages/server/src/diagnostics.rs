@@ -4,7 +4,7 @@ use std::{
 	time::Duration,
 };
 
-use crossbeam_channel::{self as chan, Sender};
+use crossbeam::channel::{self, Sender};
 use dashmap::DashMap;
 use itertools::Itertools;
 use lsp_server::{Message, Notification};
@@ -15,16 +15,16 @@ use lsp_types::{
 };
 use naga::{
 	front::wgsl,
-	valid::{Capabilities, ValidationFlags, Validator},
+	valid::{Capabilities, EntryPointError, ValidationFlags, Validator},
 };
-use parser::{AstNode, GetRange, IsWithin, ParentGranularity, ParentOfRange};
+use parser::{ast::Decl, AstNode, GetRange, IsWithin, ParentGranularity, ParentOfRange};
 use serde::{Deserialize, Serialize};
 use serde_json as json;
 
 use crate::documents;
 
 static mut TX: Option<Sender<Message>> = None;
-static mut EVENTS: Option<Sender<()>> = None;
+static mut DIRTY_NOTIFIER: Option<Sender<()>> = None;
 
 lazy_static! {
 	static ref COLLECTION: Arc<DashMap<Url, Vec<Diagnostic>>> = Arc::new(DashMap::default());
@@ -48,27 +48,24 @@ fn tx() -> Sender<Message> {
 	}
 }
 
-fn events() -> Sender<()> {
+fn dirty_notifier() -> Sender<()> {
 	unsafe {
-		if EVENTS.is_none() {
+		if DIRTY_NOTIFIER.is_none() {
 			panic!("Tried to retrieve diagnostics events sender before initialization");
 		}
-		EVENTS.as_ref().unwrap().clone()
+		DIRTY_NOTIFIER.as_ref().unwrap().clone()
 	}
 }
 
-pub fn bootstrap(tx: Sender<Message>) {
-	unsafe {
-		TX = Some(tx);
-	}
+/// This should only ever be called once, from the main thread, before `main_loop` is executed.
+pub(crate) unsafe fn bootstrap(tx: Sender<Message>) {
+	TX = Some(tx);
 
-	let (events_tx, events_rx) = chan::bounded(1);
-	unsafe {
-		EVENTS = Some(events_tx);
-	}
+	let (dirty_notifier, dirty_events) = channel::bounded(1);
+	DIRTY_NOTIFIER = Some(dirty_notifier);
 
 	thread::spawn(move || loop {
-		if let Ok(()) = events_rx.try_recv() {
+		if let Ok(()) = dirty_events.try_recv() {
 			self::publish();
 		}
 
@@ -121,7 +118,7 @@ where
 		COLLECTION.insert(uri.clone(), vec![diag]);
 	}
 
-	let _ = events().try_send(());
+	let _ = dirty_notifier().try_send(());
 }
 
 pub fn clear_errors(uri: &Url, kind: Option<ErrorKind>) {
@@ -151,7 +148,7 @@ pub fn clear_errors(uri: &Url, kind: Option<ErrorKind>) {
 			diagnostics.clear();
 		}
 
-		let _ = events().try_send(());
+		let _ = dirty_notifier().try_send(());
 	}
 }
 

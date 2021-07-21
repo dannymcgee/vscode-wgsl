@@ -9,7 +9,7 @@ use pest::{
 	iterators::{Pair, Pairs},
 	Parser as PestParser, Span,
 };
-use std::{result, time::Instant};
+use std::result;
 
 pub mod ast;
 mod error;
@@ -35,18 +35,8 @@ pub fn parse(input: &str) -> Result<Pairs<Rule>> {
 }
 
 pub fn parse_ast(input: &str) -> Result<Vec<Decl>> {
-	let start = Instant::now();
-
 	let program = parse(input)?;
-	let pest_done = Instant::now();
-
-	let result = program.parse();
-	let ast_done = Instant::now();
-
-	eprintln!("Pest parsing done in {:?}", pest_done - start);
-	eprintln!("AST parsing done in {:?}", ast_done - pest_done);
-
-	result
+	program.parse()
 }
 
 pub fn parse_stmt(input: &str) -> Result<Stmt> {
