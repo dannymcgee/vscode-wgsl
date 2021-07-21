@@ -54,17 +54,6 @@
 			"projectType": "library",
 			"sourceRoot": "packages/parser/src",
 			"targets": {
-				"build": {
-					"executor": "@nxrs/cargo:build",
-					"options": {
-						"release": true
-					},
-					"configurations": {
-						"production": {
-							"release": true
-						}
-					}
-				},
 				"test": {
 					"executor": "@nxrs/cargo:test"
 				},
@@ -82,7 +71,7 @@
 					"executor": "@nxrs/cargo:build",
 					"options": {
 						"outDir": "dist/vscode-wgsl",
-						"release": true
+						"release": false
 					},
 					"configurations": {
 						"production": {
