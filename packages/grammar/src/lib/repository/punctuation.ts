@@ -11,6 +11,7 @@ export const punctuation: TMGrammarScope = {
 			name: "punctuation.brace.curly.wgsl",
 		},
 		{
+			// eslint-disable-next-line no-useless-escape
 			match: /[\[\]]/,
 			name: "punctuation.brace.square.wgsl",
 		},

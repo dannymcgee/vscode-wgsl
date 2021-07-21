@@ -1,22 +1,25 @@
-use std::thread;
+use std::{sync::Arc, thread};
 
-use crossbeam_channel::Sender;
-use lsp_server::{Message, Response, ResponseError};
+use crossbeam::channel::Sender;
+use dashmap::DashMap;
+use itertools::Itertools;
+use lsp_server::{Message, Response};
 use lsp_types::{
 	request::{DocumentSymbolRequest, Request},
-	DocumentSymbol, DocumentSymbolParams, DocumentSymbolResponse, Position, Range, SymbolKind,
-	SymbolTag,
+	DocumentSymbol, DocumentSymbolParams, DocumentSymbolResponse, Range, SymbolKind, SymbolTag,
+	Url,
 };
 use parser::{
-	pest::{
-		iterators::{Pair, Pairs},
-		Span,
-	},
-	Rule,
+	ast::{Decl, FunctionDecl, FunctionSignature, Pretty, StructDecl, StructField, VarDecl},
+	GetRange,
 };
 use serde_json as json;
 
 use crate::documents;
+
+lazy_static! {
+	static ref CACHE: Arc<DashMap<Url, Arc<DocumentSymbolResponse>>> = Arc::new(DashMap::default());
+}
 
 pub fn handle(req: lsp_server::Request, tx: Sender<Message>) {
 	thread::spawn(move || {
@@ -24,489 +27,242 @@ pub fn handle(req: lsp_server::Request, tx: Sender<Message>) {
 			.extract::<DocumentSymbolParams>(DocumentSymbolRequest::METHOD)
 			.unwrap();
 
-		#[allow(unused_must_use)]
-		match documents::read(&params.text_document) {
-			Ok(content) => match parser::parse(&content) {
-				Ok(result) => {
-					let symbols = result.into_symbols();
-					let response = DocumentSymbolResponse::Nested(symbols);
+		let response = match documents::parse(&params.text_document.uri) {
+			Some(ast) => {
+				let symbols = ast.into_symbols();
+				let response = Arc::new(DocumentSymbolResponse::Nested(symbols));
+				CACHE.insert(params.text_document.uri, response.clone());
 
-					tx.send(Message::Response(Response {
-						id,
-						result: Some(json::to_value(&response).unwrap()),
-						error: None,
-					}));
-				}
-				Err(err) => {
-					tx.send(Message::Response(Response {
-						id,
-						result: None,
-						error: Some(ResponseError {
-							code: 1,
-							message: format!("{}", err),
-							data: None,
-						}),
-					}));
-				}
-			},
-			Err(err) => {
-				tx.send(Message::Response(Response {
-					id,
-					result: None,
-					error: Some(ResponseError {
-						code: 1,
-						message: format!("{}", err),
-						data: None,
-					}),
-				}));
+				response
 			}
-		}
-	});
-}
+			// If there's some syntax error in the file, we won't be able to parse it.
+			// In this case, just retrieve the cached result if any, or an empty vec otherwise.
+			None => match CACHE.get(&params.text_document.uri) {
+				Some(cached_entry) => Arc::clone(cached_entry.value()),
+				None => Arc::new(DocumentSymbolResponse::Nested(vec![])),
+			},
+		};
+		let result = Some(json::to_value(response.as_ref()).unwrap());
 
-trait SymbolParser {
-	fn parse(self) -> Option<DocumentSymbol>;
-	fn parse_global_var_decl(self) -> DocumentSymbol;
-	fn parse_global_const_decl(self) -> DocumentSymbol;
-	fn parse_type_alias(self) -> DocumentSymbol;
-	fn parse_struct_decl(self) -> DocumentSymbol;
-	fn parse_struct_body_decl(self) -> Vec<DocumentSymbol>;
-	fn parse_struct_member(self) -> DocumentSymbol;
-	fn parse_func_decl(self) -> DocumentSymbol;
-	fn parse_func_body(self) -> Option<Vec<DocumentSymbol>>;
-	fn parse_variable_stmt(self) -> DocumentSymbol;
+		let _ = tx.send(Message::Response(Response {
+			id,
+			result,
+			error: None,
+		}));
+	});
 }
 
 trait IntoSymbols {
 	fn into_symbols(self) -> Vec<DocumentSymbol>;
 }
 
-trait IntoRange {
-	fn into_range(self) -> Range;
+trait AsSymbol {
+	fn as_symbol(&self) -> Option<DocumentSymbol>;
 }
 
 trait Detail {
 	fn detail(&self) -> Option<String>;
 }
 
-trait PrettyDebug {
-	fn pretty(&self) -> String;
-}
-
-impl<'a> IntoSymbols for Pairs<'a, Rule> {
-	fn into_symbols(mut self) -> Vec<DocumentSymbol> {
-		let program = self
-			.find_map(|pair| {
-				if let Rule::program = pair.as_rule() {
-					Some(pair)
-				} else {
-					None
-				}
-			})
-			.unwrap();
-
-		program
-			.into_inner()
-			.filter_map(|pair| pair.parse())
-			.collect()
+impl IntoSymbols for Arc<Vec<Decl>> {
+	fn into_symbols(self) -> Vec<DocumentSymbol> {
+		self.iter().filter_map(|decl| decl.as_symbol()).collect()
 	}
 }
 
-impl<'a> IntoRange for Span<'a> {
-	fn into_range(self) -> Range {
-		let (start_line, start_col) = self.start_pos().line_col();
-		let (end_line, end_col) = self.end_pos().line_col();
+impl AsSymbol for Decl {
+	fn as_symbol(&self) -> Option<DocumentSymbol> {
+		use Decl::*;
 
-		Range {
-			start: Position {
-				line: (start_line - 1) as u32,
-				character: (start_col - 1) as u32,
-			},
-			end: Position {
-				line: (end_line - 1) as u32,
-				character: (end_col - 1) as u32,
-			},
+		let ident = self.ident();
+		let builder = DocSymBuilder::new()
+			.name(ident)
+			.range(self.range())
+			.selection_range(ident.range());
+
+		match self {
+			Var(ref inner) => Some(
+				builder
+					.kind(SymbolKind::Variable)
+					.detail(inner.detail())
+					.build(),
+			),
+			Const(ref inner) => Some(
+				builder
+					.kind(SymbolKind::Constant)
+					.detail(inner.detail())
+					.build(),
+			),
+			TypeAlias(ref inner) => Some(
+				builder
+					.kind(SymbolKind::TypeParameter)
+					.detail(Some(&inner.value))
+					.build(),
+			),
+			Struct(ref inner) => Some(
+				builder
+					.kind(SymbolKind::Struct)
+					.detail(inner.detail())
+					.children(inner.body.into_symbols())
+					.build(),
+			),
+			Function(ref inner) => Some(
+				builder
+					.kind(SymbolKind::Function)
+					.detail(inner.detail())
+					.build(),
+			),
+			_ => None,
 		}
 	}
 }
 
-impl PrettyDebug for Range {
-	fn pretty(&self) -> String {
-		format!(
-			"{}:{}..{}:{}",
-			self.start.line, self.start.character, self.end.line, self.end.character
-		)
+impl IntoSymbols for &Vec<StructField> {
+	fn into_symbols(self) -> Vec<DocumentSymbol> {
+		self.iter()
+			.map(|field| {
+				DocSymBuilder::new()
+					.kind(SymbolKind::Field)
+					.name(&field.name)
+					.detail(Some(&field.type_decl))
+					.range(field.range)
+					.selection_range(field.name.range())
+					.build()
+			})
+			.collect()
 	}
 }
 
-impl<'a> Detail for Pair<'a, Rule> {
+impl Detail for &VarDecl {
 	fn detail(&self) -> Option<String> {
-		match self.as_rule() {
-			Rule::attribute_list => Some(self.as_str().into()),
-			_ => None,
-		}
+		let attr_detail = self.attributes.as_ref().map(|attr| attr.pretty());
+		let type_detail = self.type_decl.as_ref().map(|ty| ty.to_string());
+		let combine = |a, b| format!("{} {}", a, b);
+
+		attr_detail
+			.and_then(|attr| type_detail.as_ref().map(|ty| combine(attr, ty)))
+			.or(type_detail)
 	}
 }
 
-#[allow(deprecated)]
-impl<'a> SymbolParser for Pair<'a, Rule> {
-	fn parse(self) -> Option<DocumentSymbol> {
-		use Rule::*;
-
-		let rule = self.as_rule();
-
-		match rule {
-			global_variable_decl => Some(self.parse_global_var_decl()),
-			global_constant_decl => Some(self.parse_global_const_decl()),
-			type_alias => Some(self.parse_type_alias()),
-			struct_decl => Some(self.parse_struct_decl()),
-			func_decl => Some(self.parse_func_decl()),
-			_ => None,
-		}
-	}
-
-	fn parse_global_var_decl(self) -> DocumentSymbol {
-		use Rule::*;
-
-		let kind = SymbolKind::Variable;
-		let range = self.as_span().into_range();
-
-		self.into_inner()
-			.fold(DocSymBuilder::new(kind, range), |mut accum, pair| {
-				match pair.as_rule() {
-					attribute_list => {
-						accum.detail = pair.detail();
-					}
-					variable_decl => {
-						let ident_decl = pair
-							.into_inner()
-							.flatten()
-							.find(|pair| pair.as_rule() == variable_ident_decl)
-							.unwrap();
-
-						for pair in ident_decl.into_inner() {
-							match pair.as_rule() {
-								IDENT => {
-									accum.name = Some(pair.as_str().into());
-									accum.selection_range = Some(pair.as_span().into_range());
-								}
-								type_decl => {
-									let type_detail = pair.as_str();
-									if let Some(detail) = accum.detail {
-										accum.detail = Some(format!("{} {}", detail, type_detail));
-									} else {
-										accum.detail = Some(type_detail.into());
-									}
-								}
-								_ => {}
-							}
-						}
-					}
-					_ => {}
-				}
-				accum
-			})
-			.into()
-	}
-
-	fn parse_global_const_decl(self) -> DocumentSymbol {
-		use Rule::*;
-
-		let kind = SymbolKind::Constant;
-		let range = self.as_span().into_range();
-
-		self.into_inner()
-			.fold(DocSymBuilder::new(kind, range), |mut accum, pair| {
-				match pair.as_rule() {
-					attribute_list => {
-						accum.detail = pair.detail();
-					}
-					variable_ident_decl => {
-						for pair in pair.into_inner() {
-							match pair.as_rule() {
-								IDENT => {
-									accum.name = Some(pair.as_str().into());
-									accum.selection_range = Some(pair.as_span().into_range());
-								}
-								type_decl => {
-									let type_detail = pair.as_str();
-									if let Some(detail) = accum.detail {
-										accum.detail = Some(format!("{} {}", detail, type_detail));
-									} else {
-										accum.detail = Some(type_detail.into());
-									}
-								}
-								_ => {}
-							}
-						}
-					}
-					_ => {}
-				}
-				accum
-			})
-			.into()
-	}
-
-	fn parse_type_alias(self) -> DocumentSymbol {
-		use Rule::*;
-
-		let kind = SymbolKind::TypeParameter;
-		let range = self.as_span().into_range();
-
-		self.into_inner()
-			.fold(DocSymBuilder::new(kind, range), |mut accum, pair| {
-				match pair.as_rule() {
-					IDENT => {
-						accum.name = Some(pair.as_str().into());
-						accum.selection_range = Some(pair.as_span().into_range());
-					}
-					type_decl => {
-						accum.detail = Some(pair.as_str().into());
-					}
-					_ => {}
-				}
-				accum
-			})
-			.into()
-	}
-
-	fn parse_struct_decl(self) -> DocumentSymbol {
-		use Rule::*;
-
-		let kind = SymbolKind::Struct;
-		let range = self.as_span().into_range();
-
-		self.into_inner()
-			.fold(DocSymBuilder::new(kind, range), |mut accum, pair| {
-				match pair.as_rule() {
-					IDENT => {
-						accum.name = Some(pair.as_str().into());
-						accum.selection_range = Some(pair.as_span().into_range());
-					}
-					attribute_list => {
-						accum.detail = pair.detail();
-					}
-					struct_body_decl => {
-						accum.children = Some(pair.parse_struct_body_decl());
-					}
-					_ => {}
-				}
-				accum
-			})
-			.into()
-	}
-
-	fn parse_struct_body_decl(self) -> Vec<DocumentSymbol> {
-		use Rule::*;
-
-		self.into_inner()
-			.filter_map(|pair| match pair.as_rule() {
-				struct_member => Some(pair.parse_struct_member()),
-				_ => None,
-			})
-			.collect()
-	}
-
-	fn parse_struct_member(self) -> DocumentSymbol {
-		use Rule::*;
-
-		let kind = SymbolKind::Field;
-		let range = self.as_span().into_range();
-
-		self.into_inner()
-			.fold(DocSymBuilder::new(kind, range), |mut accum, pair| {
-				match pair.as_rule() {
-					attribute_list => {
-						accum.detail = pair.detail();
-					}
-					variable_ident_decl => {
-						for pair in pair.into_inner() {
-							match pair.as_rule() {
-								IDENT => {
-									accum.name = Some(pair.as_str().into());
-									accum.selection_range = Some(pair.as_span().into_range());
-								}
-								type_decl => {
-									let type_detail = pair.as_str();
-									if let Some(detail) = accum.detail {
-										accum.detail = Some(format!("{} {}", detail, type_detail));
-									} else {
-										accum.detail = Some(type_detail.into());
-									}
-								}
-								_ => {}
-							}
-						}
-					}
-					_ => {}
-				}
-				accum
-			})
-			.into()
-	}
-
-	fn parse_func_decl(self) -> DocumentSymbol {
-		use Rule::*;
-
-		let kind = SymbolKind::Function;
-		let range = self.as_span().into_range();
-		let mut signature = String::new();
-
-		let mut symbol =
-			self.into_inner()
-				.fold(DocSymBuilder::new(kind, range), |mut accum, pair| {
-					match pair.as_rule() {
-						attribute_list => {
-							accum.detail = pair.detail();
-						}
-						func_header => {
-							for pair in pair.into_inner() {
-								match pair.as_rule() {
-									IDENT => {
-										accum.name = Some(pair.as_str().into());
-										accum.selection_range = Some(pair.as_span().into_range());
-									}
-									param_list => {
-										signature.push_str("fn(");
-										signature.push_str(
-											&pair
-												.into_inner()
-												.flatten()
-												.filter_map(|pair| match pair.as_rule() {
-													type_decl => Some(pair.as_str()),
-													_ => None,
-												})
-												.collect::<Vec<_>>()
-												.join(", "),
-										);
-										signature.push(')');
-									}
-									func_return_type => {
-										signature.push(' ');
-										signature.push_str(pair.as_str());
-									}
-									_ => {}
-								}
-							}
-						}
-						compound_stmt => {
-							accum.children = pair.parse_func_body();
-						}
-						_ => {}
-					}
-					accum
-				});
-
-		if let Some(detail) = symbol.detail {
-			symbol.detail = Some(format!("{} {}", detail, signature));
-		} else {
-			symbol.detail = Some(signature);
-		}
-
-		symbol.into()
-	}
-
-	fn parse_func_body(self) -> Option<Vec<DocumentSymbol>> {
-		use Rule::*;
-
-		let symbols = self
-			.into_inner()
-			.flatten()
-			.filter_map(|pair| match pair.as_rule() {
-				variable_stmt => Some(pair.parse_variable_stmt()),
-				_ => None,
-			})
-			.collect::<Vec<_>>();
-
-		if !symbols.is_empty() {
-			Some(symbols)
-		} else {
-			None
-		}
-	}
-
-	fn parse_variable_stmt(self) -> DocumentSymbol {
-		use Rule::*;
-
-		let range = self.as_span().into_range();
-		let kind = SymbolKind::Variable;
-
-		self.into_inner()
-			.fold(DocSymBuilder::new(kind, range), |mut accum, pair| {
-				match pair.as_rule() {
-					LET => {
-						accum.kind = SymbolKind::Constant;
-					}
-					variable_decl => {
-						let ident_decl = pair
-							.into_inner()
-							.flatten()
-							.find(|pair| pair.as_rule() == variable_ident_decl)
-							.unwrap();
-
-						for pair in ident_decl.into_inner() {
-							match pair.as_rule() {
-								IDENT => {
-									accum.name = Some(pair.as_str().into());
-									accum.selection_range = Some(pair.as_span().into_range());
-								}
-								type_decl => {
-									accum.detail = Some(pair.as_str().into());
-								}
-								_ => {}
-							}
-						}
-					}
-					variable_ident_decl => {
-						for pair in pair.into_inner() {
-							match pair.as_rule() {
-								IDENT => {
-									accum.name = Some(pair.as_str().into());
-									accum.selection_range = Some(pair.as_span().into_range());
-								}
-								type_decl => {
-									accum.detail = Some(pair.as_str().into());
-								}
-								_ => {}
-							}
-						}
-					}
-					IDENT => {
-						accum.name = Some(pair.as_str().into());
-						accum.selection_range = Some(pair.as_span().into_range());
-					}
-					_ => {}
-				}
-				accum
-			})
-			.into()
+impl Detail for &StructDecl {
+	fn detail(&self) -> Option<String> {
+		self.attributes
+			.as_ref()
+			.map(|attributes| attributes.pretty())
 	}
 }
 
-#[derive(Debug)]
+impl Detail for &StructField {
+	fn detail(&self) -> Option<String> {
+		let type_detail = self.type_decl.to_string();
+
+		self.attributes
+			.as_ref()
+			.map(|attr| format!("{} {}", attr.pretty(), type_detail))
+			.or(Some(type_detail))
+	}
+}
+
+impl Detail for &FunctionDecl {
+	fn detail(&self) -> Option<String> {
+		let sig_detail = (&self.signature).detail().unwrap();
+
+		self.attributes
+			.as_ref()
+			.map(|attr| format!("{} {}", attr.pretty(), sig_detail))
+			.or(Some(sig_detail))
+	}
+}
+
+impl Detail for &FunctionSignature {
+	fn detail(&self) -> Option<String> {
+		Some(format!(
+			"fn({}){}",
+			self.params
+				.iter()
+				.map(|param| param.type_decl.to_string())
+				.join(", "),
+			self.return_type
+				.as_ref()
+				.map_or("".to_string(), |ty| format!(" -> {}", ty))
+		))
+	}
+}
+
+#[derive(Debug, Default)]
 struct DocSymBuilder {
-	kind: SymbolKind,
+	kind: Option<SymbolKind>,
 	name: Option<String>,
-	range: Range,
+	range: Option<Range>,
 	selection_range: Option<Range>,
 	detail: Option<String>,
 	tags: Option<Vec<SymbolTag>>,
-	deprecated: Option<bool>,
 	children: Option<Vec<DocumentSymbol>>,
 }
 
 impl DocSymBuilder {
-	pub fn new(kind: SymbolKind, range: Range) -> Self {
-		Self {
-			kind,
-			name: None,
-			range,
-			selection_range: None,
-			detail: None,
-			tags: None,
-			deprecated: None,
-			children: None,
+	fn new() -> Self {
+		Self::default()
+	}
+
+	fn kind(mut self, kind: SymbolKind) -> Self {
+		self.kind = Some(kind);
+		self
+	}
+
+	fn name<S>(mut self, name: S) -> Self
+	where
+		S: ToString,
+	{
+		self.name = Some(name.to_string());
+		self
+	}
+
+	fn range(mut self, range: Range) -> Self {
+		self.range = Some(range);
+		self
+	}
+
+	fn selection_range(mut self, range: Range) -> Self {
+		self.selection_range = Some(range);
+		self
+	}
+
+	fn detail<S>(mut self, detail: Option<S>) -> Self
+	where
+		S: ToString,
+	{
+		self.detail = detail.map(|inner| inner.to_string());
+		self
+	}
+
+	#[allow(dead_code)]
+	fn tags(mut self, tags: Vec<SymbolTag>) -> Self {
+		self.tags = Some(tags);
+		self
+	}
+
+	fn children(mut self, children: Vec<DocumentSymbol>) -> Self {
+		self.children = Some(children);
+		self
+	}
+
+	fn build(self) -> DocumentSymbol {
+		if self.kind.is_none() {
+			panic!("`kind` field not initialized!");
 		}
+		if self.name.is_none() {
+			panic!("`name` field not initialized!");
+		}
+		if self.range.is_none() {
+			panic!("`range` field not initialized!");
+		}
+		if self.selection_range.is_none() {
+			panic!("`selection_range` field not initialized!");
+		}
+
+		self.into()
 	}
 }
 
@@ -514,13 +270,13 @@ impl DocSymBuilder {
 impl From<DocSymBuilder> for DocumentSymbol {
 	fn from(partial: DocSymBuilder) -> Self {
 		Self {
-			kind: partial.kind,
+			kind: partial.kind.unwrap(),
 			name: partial.name.unwrap(),
-			range: partial.range,
+			range: partial.range.unwrap(),
 			selection_range: partial.selection_range.unwrap(),
 			detail: partial.detail,
 			tags: partial.tags,
-			deprecated: partial.deprecated,
+			deprecated: None,
 			children: partial.children,
 		}
 	}

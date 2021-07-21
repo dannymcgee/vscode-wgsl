@@ -199,6 +199,24 @@ literal_or_ident = {
 
 // --- Types -------------------------------------------------------------------
 
+builtin_type_decl = {
+	BOOL
+	| FLOAT32
+	| INT32
+	| UINT32
+	| VEC ~ LANGLE ~ type_decl ~ RANGLE
+	| PTR
+		~ LANGLE ~ storage_class
+		~ COMMA ~ type_decl
+		~ ( COMMA ~ access_mode )?
+		~ RANGLE
+	| attribute_list*
+		~ ARRAY
+		~ LANGLE ~ type_decl ~ ( COMMA ~ INT_LITERAL )? ~ RANGLE
+	| MATRIX ~ LANGLE ~ type_decl ~ RANGLE
+	| texture_sampler_type
+}
+
 type_decl = {
 	BOOL
 	| FLOAT32
@@ -281,8 +299,8 @@ const_expr = {
 	const_literal
 	| type_decl
 		~ LPAREN
-		~ (( const_expr ~ COMMA )*
-			~ const_expr ~ COMMA? )?
+		~ ( const_expr ~ COMMA )*
+		~ ( const_expr ~ COMMA? )?
 		~ RPAREN
 }
 
@@ -311,7 +329,7 @@ BINOP = ${
 }
 
 expression = {
-	singular_expr ~ ( BINOP ~ singular_expr )*
+	singular_expr ~ ( BINOP ~ expression )?
 }
 singular_expr = {
 	( unary_expr | primary_expr )
@@ -325,11 +343,12 @@ unary_expr = {
 	| AND ~ singular_expr
 }
 primary_expr = {
-	type_decl ~ argument_expr_list
+	builtin_type_decl ~ argument_expr_list
 	| const_literal
 	| paren_expr
 	| BITCAST ~ LANGLE ~ type_decl ~ RANGLE ~ paren_expr
-	| IDENT ~ argument_expr_list?
+	| func_call_expr
+	| IDENT
 }
 postfix_expr = {
 	LBRACK ~ expression ~ RBRACK ~ postfix_expr*
@@ -337,12 +356,15 @@ postfix_expr = {
 }
 argument_expr_list = {
 	LPAREN
-	~ (( expression ~ COMMA )*
-		~ expression ~ COMMA? )?
+	~ ( expression ~ COMMA )*
+	~ ( expression ~ COMMA? )?
 	~ RPAREN
 }
 paren_expr = {
 	LPAREN ~ expression ~ RPAREN
+}
+func_call_expr = {
+	IDENT ~ argument_expr_list
 }
 
 
@@ -389,10 +411,13 @@ else_stmt = {
 switch_stmt = {
 	SWITCH ~ paren_expr
 	~ LBRACE
-	~ switch_body+
+	~ switch_body
 	~ RBRACE
 }
 switch_body = {
+	case_stmt+
+}
+case_stmt = {
 	( CASE ~ case_selectors
 		| DEFAULT )
 	~ COLON
@@ -465,7 +490,7 @@ func_return_type = {
 }
 param_list = {
 	( param ~ COMMA )*
-	~ param ~ COMMA?
+	~ ( param ~ COMMA? )?
 }
 param = {
 	attribute_list*

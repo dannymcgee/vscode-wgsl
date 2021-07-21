@@ -29,7 +29,7 @@
 	"projects": {
 		"client": {
 			"tags": [],
-			"implicitDependencies": ["server"]
+			"implicitDependencies": ["grammar", "server"]
 		},
 		"grammar": {
 			"tags": []
@@ -44,5 +44,6 @@
 	"workspaceLayout": {
 		"appsDir": "packages",
 		"libsDir": "packages"
-	}
+	},
+	"plugins": ["@nxrs/cargo"]
 }
