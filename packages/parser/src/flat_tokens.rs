@@ -23,6 +23,7 @@ impl FlatTokens for Decl {
 			Field(inner) => inner.flat_tokens(tokens),
 			Function(inner) => inner.flat_tokens(tokens),
 			Param(inner) => inner.flat_tokens(tokens),
+			Extension(inner) => inner.flat_tokens(tokens),
 		}
 	}
 }
@@ -147,6 +148,13 @@ impl FlatTokens for FunctionParam {
 
 		tokens.push(self.name.clone());
 		self.type_decl.flat_tokens(tokens);
+	}
+}
+
+impl FlatTokens for ExtensionDecl {
+	fn flat_tokens(&self, tokens: &mut Vec<Token>) {
+		tokens.push(self.keyword.clone());
+		tokens.push(self.name.clone());
 	}
 }
 

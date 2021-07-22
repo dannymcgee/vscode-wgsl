@@ -90,17 +90,17 @@ impl Document {
 			Arc::new(tokens)
 		});
 
-		if ast.is_some() {
-			diagnostics::validate(uri.clone(), input.into());
-		}
-
-		Ok(Self {
+		let result = Self {
 			uri: uri.clone(),
 			text,
 			ast,
 			scopes,
 			tokens,
-		})
+		};
+
+		result.validate();
+
+		Ok(result)
 	}
 
 	fn read(&self) -> String {
@@ -160,11 +160,19 @@ impl Document {
 			Arc::new(tokens)
 		});
 
-		if self.ast.is_some() {
-			diagnostics::validate(self.uri.clone(), self.text.to_string());
-		}
+		self.validate();
 
 		Ok(())
+	}
+
+	fn validate(&self) {
+		if let Some(ref ast) = self.ast {
+			if ast.iter().any(|decl| matches!(decl, Decl::Extension(_))) {
+				// TODO
+			} else {
+				diagnostics::validate(self.uri.clone(), self.text.to_string());
+			}
+		}
 	}
 }
 

@@ -6,7 +6,7 @@ use lsp_types::{
 	request::{GotoDefinition, Request},
 	GotoDefinitionParams, GotoDefinitionResponse, Location, Range,
 };
-use parser::{FlatTokens, GetRange, IsWithin};
+use parser::{GetRange, IsWithin};
 use serde_json as json;
 
 use crate::documents;
@@ -24,11 +24,8 @@ pub fn handle(req: lsp_server::Request, tx: Sender<Message>) {
 			end: pos,
 		};
 
-		let result = documents::parse(&uri)
-			.and_then(|ast| {
-				let mut tokens = vec![];
-				ast.flat_tokens(&mut tokens);
-
+		let result = documents::tokens(&uri)
+			.and_then(|tokens| {
 				tokens
 					.iter()
 					.find(|token| symbol_range.is_within(&token.range()))

@@ -55,6 +55,7 @@ trait AstParser {
 
 trait AstNodeParser<'a> {
 	fn parse(self) -> Option<Decl>;
+	fn parse_directive(self) -> Decl;
 	fn parse_global_var_decl(self) -> Decl;
 	fn parse_variable_qualifier(self) -> Vec<Token>;
 	fn parse_global_const_decl(self) -> Decl;
@@ -117,6 +118,7 @@ impl<'a> AstNodeParser<'a> for Pair<'a, Rule> {
 		use Rule::*;
 
 		match self.as_rule() {
+			directive => Some(self.parse_directive()),
 			type_alias => Some(self.parse_type_alias_decl()),
 			global_variable_decl => Some(self.parse_global_var_decl()),
 			global_constant_decl => Some(self.parse_global_const_decl()),
@@ -124,6 +126,24 @@ impl<'a> AstNodeParser<'a> for Pair<'a, Rule> {
 			func_decl => Some(self.parse_func_decl()),
 			_ => None,
 		}
+	}
+
+	fn parse_directive(self) -> Decl {
+		use Rule::*;
+
+		let span = self.as_span();
+		let decl = &mut ExtensionDeclBuilder::default();
+
+		let decl = fold_children!(self, decl, pair {
+			ENABLE => decl.keyword(Token::keyword(pair)),
+			IDENT => decl.name(Token::module(pair)),
+			_ => decl,
+		})
+		.range(span.into_range())
+		.build()
+		.unwrap();
+
+		Decl::Extension(decl)
 	}
 
 	fn parse_global_var_decl(self) -> Decl {
@@ -602,6 +622,7 @@ impl<'a> AstNodeParser<'a> for Pair<'a, Rule> {
 				stmt.condition(Box::new(expr))
 			},
 			compound_stmt => stmt.body(pair.parse_compound_stmt()),
+			// FIXME
 			elseif_stmt => panic!("Please un-nest the elseif stmts, it makes me sad"),
 			_ => unreachable!(),
 		})
@@ -1106,6 +1127,13 @@ impl<'a> Token {
 		let range = pair.as_span().into_range();
 
 		Token::Literal(text, range)
+	}
+
+	fn module(pair: Pair<'a, Rule>) -> Token {
+		let text = pair.as_str().to_string();
+		let range = pair.as_span().into_range();
+
+		Token::Module(text, range)
 	}
 }
 

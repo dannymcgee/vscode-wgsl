@@ -3,7 +3,7 @@ import { TMGrammarScope } from "@vscode-devkit/grammar";
 export const keyword: TMGrammarScope = {
 	patterns: [
 		{
-			match: /\b(if|else|loop|continu(?:e|ing)|break|return)\b/,
+			match: /\b(if|else|loop|continu(?:e|ing)|break|return|enable)\b/,
 			name: "keyword.control.$1.wgsl",
 		},
 		{

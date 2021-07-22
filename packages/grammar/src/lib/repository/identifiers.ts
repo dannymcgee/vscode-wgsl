@@ -17,6 +17,12 @@ export const identifier: TMGrammarScope = {
 			},
 		},
 		{
+			match: regex`/(?<=enable )(${IDENT})/`,
+			captures: {
+				1: { name: "entity.name.module.wgsl" },
+			},
+		},
+		{
 			match: /\b([A-Z][_a-zA-Z0-9]*)\b/,
 			captures: {
 				1: { name: "entity.name.type.struct.wgsl" },

@@ -498,6 +498,13 @@ param = {
 }
 
 
+// --- Directives --------------------------------------------------------------
+
+directive = {
+	ENABLE ~ IDENT ~ SEMICOLON
+}
+
+
 // --- Program -----------------------------------------------------------------
 
 program = {
@@ -508,7 +515,7 @@ program = {
 		| ( type_alias ~ SEMICOLON )
 		| ( struct_decl ~ SEMICOLON )
 		| func_decl
-		| ( ENABLE ~ IDENT ~ SEMICOLON )
+		| directive
 	)*
 	~ EOI
 }

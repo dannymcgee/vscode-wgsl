@@ -49,6 +49,7 @@ impl GetRange for Decl {
 			Field(inner) => inner.range,
 			Function(inner) => inner.range,
 			Param(inner) => inner.range,
+			Extension(inner) => inner.range,
 		}
 	}
 }
@@ -90,6 +91,7 @@ impl GetRange for Token {
 			Punct(_, range) => range,
 			Op(_, range) => range,
 			Literal(_, range) => range,
+			Module(_, range) => range,
 		}
 	}
 }

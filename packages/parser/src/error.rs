@@ -156,6 +156,7 @@ impl fmt::Display for Rule {
 			func_return_type => "function return type",
 			param_list => "parameter list",
 			param => "parameter",
+			directive => "directive",
 			program => "program",
 		};
 

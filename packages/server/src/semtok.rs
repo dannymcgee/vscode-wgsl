@@ -83,6 +83,7 @@ struct TokenDelta {
 #[repr(u32)]
 #[allow(dead_code)]
 enum TokenType {
+	Namespace,
 	Type,
 	Struct,
 	Parameter,
@@ -113,6 +114,7 @@ enum TokenMod {
 pub fn legend() -> SemanticTokensLegend {
 	SemanticTokensLegend {
 		token_types: vec![
+			TType::NAMESPACE,
 			TType::TYPE,
 			TType::STRUCT,
 			TType::PARAMETER,
@@ -184,6 +186,7 @@ impl GetTokenType for Scopes {
 			Token::Keyword(text, range) => (Keyword, text, range),
 			Token::Op(text, range) => (Operator, text, range),
 			Token::Literal(text, range) => (Number, text, range),
+			Token::Module(text, range) => (Namespace, text, range),
 			_ => unreachable!(),
 		};
 
@@ -216,6 +219,7 @@ impl GetTokenType for Scopes {
 								Decl::Field(_) => (Property, decl_mod),
 								Decl::Function(_) => (Function, decl_mod),
 								Decl::Param(_) => (Parameter, decl_mod),
+								Decl::Extension(_) => (Namespace, decl_mod),
 							}
 						})
 					} else {

@@ -27,6 +27,7 @@ pub enum Token {
 	Punct(String, Range),
 	Op(String, Range),
 	Literal(String, Range),
+	Module(String, Range),
 }
 
 impl Token {
@@ -43,6 +44,7 @@ impl Token {
 			Punct(text, range) => (text, range),
 			Op(text, range) => (text, range),
 			Literal(text, range) => (text, range),
+			Module(text, range) => (text, range),
 		}
 	}
 
@@ -59,6 +61,7 @@ impl Token {
 			Punct(text, range) => (text, *range),
 			Op(text, range) => (text, *range),
 			Literal(text, range) => (text, *range),
+			Module(text, range) => (text, *range),
 		}
 	}
 }
@@ -75,6 +78,7 @@ impl fmt::Debug for Token {
 			Self::Punct(inner, range) => ("Punct", inner, range),
 			Self::Op(inner, range) => ("Op", inner, range),
 			Self::Literal(inner, range) => ("Literal", inner, range),
+			Self::Module(inner, range) => ("Module", inner, range),
 		};
 
 		write!(f, "`{}` | Token::{} [{}]", inner, name, range.pretty())
@@ -95,6 +99,7 @@ impl fmt::Display for Token {
 			Punct(text, _) => text,
 			Op(text, _) => text,
 			Literal(text, _) => text,
+			Module(text, _) => text,
 		};
 
 		write!(f, "{}", text)
@@ -110,6 +115,7 @@ pub enum Decl {
 	Field(StructField),
 	Function(FunctionDecl),
 	Param(FunctionParam),
+	Extension(ExtensionDecl),
 }
 
 impl Decl {
@@ -123,6 +129,7 @@ impl Decl {
 			Field(ref inner) => &inner.name,
 			Function(ref inner) => &inner.name,
 			Param(ref inner) => &inner.name,
+			Extension(ref inner) => &inner.name,
 		}
 	}
 }
@@ -143,6 +150,7 @@ impl fmt::Display for Decl {
 				write!(f, "{} {}{}", decl.storage, decl.name, decl.signature)
 			}
 			Param(decl) => write!(f, "{}", decl),
+			Extension(decl) => write!(f, "{}", decl),
 		}
 	}
 }
@@ -522,6 +530,29 @@ impl fmt::Display for FunctionParam {
 		}
 
 		write!(f, "{}: {}", self.name, self.type_decl)
+	}
+}
+
+#[derive(Builder, Clone)]
+pub struct ExtensionDecl {
+	pub keyword: Token,
+	pub name: Token,
+	pub range: Range,
+}
+
+impl fmt::Debug for ExtensionDecl {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		f.debug_struct("ExtensionDecl")
+			.field("keyword", &self.keyword)
+			.field("name", &self.name)
+			.field("range", &self.range.pretty())
+			.finish()
+	}
+}
+
+impl fmt::Display for ExtensionDecl {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "{} {};", self.keyword, self.name)
 	}
 }
 
