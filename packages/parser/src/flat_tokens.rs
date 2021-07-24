@@ -24,6 +24,7 @@ impl FlatTokens for Decl {
 			Function(inner) => inner.flat_tokens(tokens),
 			Param(inner) => inner.flat_tokens(tokens),
 			Extension(inner) => inner.flat_tokens(tokens),
+			Module(inner) => inner.flat_tokens(tokens),
 		}
 	}
 }
@@ -74,6 +75,10 @@ impl FlatTokens for TypeDecl {
 
 		if let Some(ref access_mode) = self.access_mode {
 			tokens.push(access_mode.clone());
+		}
+
+		if let Some(ref namespace) = self.namespace {
+			tokens.push(namespace.clone());
 		}
 
 		tokens.push(self.name.clone());
@@ -155,6 +160,15 @@ impl FlatTokens for ExtensionDecl {
 	fn flat_tokens(&self, tokens: &mut Vec<Token>) {
 		tokens.push(self.keyword.clone());
 		tokens.push(self.name.clone());
+	}
+}
+
+impl FlatTokens for ModuleDecl {
+	fn flat_tokens(&self, tokens: &mut Vec<Token>) {
+		tokens.push(self.import_keyword.clone());
+		tokens.push(self.name.clone());
+		tokens.push(self.from_keyword.clone());
+		tokens.push(self.path.clone());
 	}
 }
 

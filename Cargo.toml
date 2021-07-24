@@ -1,5 +1,6 @@
 [workspace]
 members = [
 	"packages/parser",
-	"packages/server"
+	"packages/server",
+	"packages/wgsl-plus",
 ]

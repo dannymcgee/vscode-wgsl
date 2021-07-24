@@ -22,6 +22,7 @@ AND         = @{ "&" }
 AND_AND     = @{ "&&" }
 ARROW       = @{ "->" }
 BANG        = @{ "!" }
+SCOPE       = @{ "::" }
 COLON       = @{ ":" }
 COMMA       = @{ "," }
 DOT         = @{ "." }
@@ -92,6 +93,7 @@ LET         = @{ "let" }
 STRUCT      = @{ "struct" }
 TYPE        = @{ "type" }
 VAR         = @{ "var" }
+EXPORT      = @{ "export" }
 
 // Storage modifiers
 FUNCTION    = @{ "function" }
@@ -117,6 +119,7 @@ IF          = @{ "if" }
 LOOP        = @{ "loop" }
 RETURN      = @{ "return" }
 SWITCH      = @{ "switch" }
+FROM        = @{ "from" }
 
 // Builtin constants
 FALSE       = @{ "false" }
@@ -126,9 +129,16 @@ TRUE        = @{ "true" }
 BITCAST     = @{ "bitcast" }
 DISCARD     = @{ "discard" }
 ENABLE      = @{ "enable" }
+IMPORT      = @{ "import" }
 
 // Other...?
 BLOCK       = @{ "block" }
+
+
+// WGSL+ additions
+plus_export_modifier = {
+	LANGLE ~ EXPORT ~ RANGLE
+}
 
 
 // --- Literals ----------------------------------------------------------------
@@ -168,6 +178,12 @@ UINT_LITERAL = @{
 }
 
 FLOAT_LITERAL = @{ DECIMAL_FLOAT_LITERAL | HEX_FLOAT_LITERAL }
+
+PATH_LITERAL = @{
+	"\""
+	~ ( ASCII_ALPHANUMERIC | DOT | SLASH | WHITESPACE )+
+	~ "\""
+}
 
 const_literal = {
 	FLOAT_LITERAL
@@ -233,6 +249,7 @@ type_decl = {
 		~ LANGLE ~ type_decl ~ ( COMMA ~ INT_LITERAL )? ~ RANGLE
 	| MATRIX ~ LANGLE ~ type_decl ~ RANGLE
 	| texture_sampler_type
+	| plus_namespaced_type
 	| IDENT
 }
 
@@ -259,9 +276,30 @@ texture_sampler_type = {
 	| SAMPLER_TYPE
 }
 
-struct_decl      = { attribute_list* ~ STRUCT ~ IDENT ~ struct_body_decl }
-struct_body_decl = { LBRACE ~ struct_member* ~ RBRACE }
-struct_member    = { attribute_list* ~ variable_ident_decl ~ SEMICOLON }
+plus_namespaced_type = {
+	namespace
+	~ SCOPE
+	~ IDENT
+}
+namespace = { IDENT }
+
+struct_decl = {
+	attribute_list*
+	~ STRUCT
+	~ plus_export_modifier?
+	~ IDENT
+	~ struct_body_decl
+}
+struct_body_decl = {
+	LBRACE
+	~ struct_member*
+	~ RBRACE
+}
+struct_member = {
+	attribute_list*
+	~ variable_ident_decl
+	~ SEMICOLON
+}
 
 type_alias = {
 	TYPE ~ IDENT ~ EQUAL ~ type_decl
@@ -477,7 +515,9 @@ func_decl = {
 	~ compound_stmt
 }
 func_header = {
-	FN ~ IDENT
+	FN
+	~ plus_export_modifier?
+	~ IDENT
 	~ LPAREN
 	~ param_list?
 	~ RPAREN
@@ -501,7 +541,16 @@ param = {
 // --- Directives --------------------------------------------------------------
 
 directive = {
+	enable_directive
+	| plus_import_directive
+}
+
+enable_directive = {
 	ENABLE ~ IDENT ~ SEMICOLON
+}
+
+plus_import_directive = {
+	IMPORT ~ IDENT ~ FROM ~ PATH_LITERAL ~ SEMICOLON
 }
 
 

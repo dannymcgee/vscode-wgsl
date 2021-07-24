@@ -39,6 +39,9 @@
 		},
 		"server": {
 			"tags": []
+		},
+		"wgsl_plus": {
+			"tags": []
 		}
 	},
 	"workspaceLayout": {

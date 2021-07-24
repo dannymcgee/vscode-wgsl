@@ -8,7 +8,7 @@ use lsp_types::{
 	SemanticToken, SemanticTokenModifier as TMod, SemanticTokenType as TType, SemanticTokens,
 	SemanticTokensLegend, SemanticTokensParams, Url,
 };
-use parser::{ast::Token, GetRange, IsWithin};
+use parser::{ast::Token, GetRange};
 use serde_json as json;
 
 use crate::documents::{self, Scopes};
@@ -95,6 +95,7 @@ enum TokenType {
 	Modifier,
 	Comment,
 	Number,
+	String,
 	Operator,
 }
 
@@ -126,6 +127,7 @@ pub fn legend() -> SemanticTokensLegend {
 			TType::MODIFIER,
 			TType::COMMENT,
 			TType::NUMBER,
+			TType::STRING,
 			TType::OPERATOR,
 		],
 		token_modifiers: vec![
@@ -177,16 +179,22 @@ impl GetTokenType for Scopes {
 	fn get_token_type(&self, token: &Token) -> (TokenType, u32) {
 		use TokenType::*;
 
-		let (lexical_token, name, token_range) = match token {
-			Token::Ident(text, range) => (Variable, text, range),
-			Token::Attr(text, range) => (Macro, text, range),
-			Token::Field(text, range) => (Property, text, range),
-			Token::Type(text, range) => (Type, text, range),
-			Token::Function(text, range) => (Function, text, range),
-			Token::Keyword(text, range) => (Keyword, text, range),
-			Token::Op(text, range) => (Operator, text, range),
-			Token::Literal(text, range) => (Number, text, range),
-			Token::Module(text, range) => (Namespace, text, range),
+		let (lexical_token, token_range) = match token {
+			Token::Ident(_, range) => (Variable, range),
+			Token::Attr(_, range) => (Macro, range),
+			Token::Field(_, range) => (Property, range),
+			Token::Type(_, range) => (Type, range),
+			Token::Function(_, range) => (Function, range),
+			Token::Keyword(_, range) => (Keyword, range),
+			Token::Op(_, range) => (Operator, range),
+			Token::Module(_, range) => (Namespace, range),
+			Token::Literal(text, range) => {
+				if text.starts_with('"') {
+					(TokenType::String, range)
+				} else {
+					(Number, range)
+				}
+			}
 			_ => unreachable!(),
 		};
 
@@ -194,40 +202,35 @@ impl GetTokenType for Scopes {
 			Type | Variable | Function | Parameter => {
 				use parser::ast::Decl;
 
-				let found = self.iter().find_map(|(scope_range, scope)| {
-					if token_range.is_within(scope_range) {
-						scope.get(name).map(|decl| {
-							let decl_mod = if decl.ident().range() == *token_range {
-								TokenMod::Decl
-							} else {
-								TokenMod::None
-							} as u32;
+				self.find_decl(token)
+					.map(|decl| {
+						let decl_mod = if decl.decl.ident().range() == *token_range {
+							TokenMod::Decl
+						} else {
+							TokenMod::None
+						} as u32;
 
-							match *decl.as_ref() {
-								Decl::Var(ref decl) => {
-									let (storage, _) = decl.storage.borrow_inner();
-									let mods = if storage == "let" {
-										decl_mod | TokenMod::Readonly as u32
-									} else {
-										decl_mod
-									};
-									(Variable, mods)
-								}
-								Decl::Const(_) => (Variable, decl_mod | TokenMod::Readonly as u32),
-								Decl::TypeAlias(_) => (Type, decl_mod),
-								Decl::Struct(_) => (Struct, decl_mod),
-								Decl::Field(_) => (Property, decl_mod),
-								Decl::Function(_) => (Function, decl_mod),
-								Decl::Param(_) => (Parameter, decl_mod),
-								Decl::Extension(_) => (Namespace, decl_mod),
+						match *decl.decl.as_ref() {
+							Decl::Var(ref decl) => {
+								let (storage, _) = decl.storage.borrow_inner();
+								let mods = if storage == "let" {
+									decl_mod | TokenMod::Readonly as u32
+								} else {
+									decl_mod
+								};
+								(Variable, mods)
 							}
-						})
-					} else {
-						None
-					}
-				});
-
-				found.unwrap_or((lexical_token, 0))
+							Decl::Const(_) => (Variable, decl_mod | TokenMod::Readonly as u32),
+							Decl::TypeAlias(_) => (Type, decl_mod),
+							Decl::Struct(_) => (Struct, decl_mod),
+							Decl::Field(_) => (Property, decl_mod),
+							Decl::Function(_) => (Function, decl_mod),
+							Decl::Param(_) => (Parameter, decl_mod),
+							Decl::Module(_) => (Namespace, decl_mod),
+							Decl::Extension(_) => unreachable!(),
+						}
+					})
+					.unwrap_or((lexical_token, 0))
 			}
 			_ => (lexical_token, 0),
 		}

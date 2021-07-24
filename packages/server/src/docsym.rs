@@ -66,7 +66,10 @@ trait Detail {
 
 impl IntoSymbols for Arc<Vec<Decl>> {
 	fn into_symbols(self) -> Vec<DocumentSymbol> {
-		self.iter().filter_map(|decl| decl.as_symbol()).collect()
+		Arc::clone(&self)
+			.iter()
+			.filter_map(|decl| decl.as_symbol())
+			.collect()
 	}
 }
 

@@ -35,6 +35,7 @@ lazy_static! {
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum ErrorKind {
 	ParseError,
+	TranspileError,
 	NagaParseError,
 	NagaValidationError,
 }
@@ -102,6 +103,7 @@ where
 {
 	let diag = match kind {
 		ErrorKind::ParseError => err.into_diagnostic(kind, None, None),
+		ErrorKind::TranspileError => err.into_diagnostic(kind, None, None), // TODO
 		ErrorKind::NagaValidationError => err.into_diagnostic(kind, Some(uri), None),
 		ErrorKind::NagaParseError => {
 			let src = match documents::read(uri) {
@@ -332,6 +334,16 @@ impl IntoDiagnostic for wgsl::ParseError {
 	}
 }
 
+impl IntoDiagnostic for anyhow::Error {
+	fn into_diagnostic(self, kind: ErrorKind, _: Option<&Url>, _: Option<&str>) -> Diagnostic {
+		DiagnosticBuilder::new(kind)
+			.range(Range::first_line())
+			.severity(DiagnosticSeverity::Error)
+			.message(format!("TranspileError: {}", self))
+			.build()
+	}
+}
+
 macro_rules! lookup_token {
 	($scopes:ident, $variant:ident($name:ident)) => {
 		$scopes.iter().rev().find_map(|(_, map)| {
@@ -347,23 +359,12 @@ impl IntoDiagnostic for naga::valid::ValidationError {
 	fn into_diagnostic(self, kind: ErrorKind, uri: Option<&Url>, _: Option<&str>) -> Diagnostic {
 		use naga::valid::ValidationError::*;
 
-		let first_line = Range {
-			start: Position {
-				line: 0,
-				character: 0,
-			},
-			end: Position {
-				line: 1,
-				character: 0,
-			},
-		};
-
 		let uri = uri.expect("uri must be provided for naga ParseError");
 		let scopes = match documents::scopes(uri) {
 			Some(scopes) => scopes,
 			None => {
 				return DiagnosticBuilder::new(kind)
-					.range(first_line)
+					.range(Range::first_line())
 					.severity(DiagnosticSeverity::Error)
 					.message(format!("ValidationError: {}", self))
 					.build()
@@ -402,7 +403,7 @@ impl IntoDiagnostic for naga::valid::ValidationError {
 		// FIXME: Use a real range once https://github.com/gfx-rs/naga/issues/358 is fixed upstream
 		let range = match token {
 			Some(token) => token.range(),
-			None => first_line,
+			None => Range::first_line(),
 		};
 
 		DiagnosticBuilder::new(kind)
@@ -457,6 +458,25 @@ impl AsRange for pest::error::LineColLocation {
 					line: *end_line as u32 - 1,
 					character: *end_col as u32 - 1,
 				},
+			},
+		}
+	}
+}
+
+trait FirstLine {
+	fn first_line() -> Self;
+}
+
+impl FirstLine for Range {
+	fn first_line() -> Self {
+		Range {
+			start: Position {
+				line: 0,
+				character: 0,
+			},
+			end: Position {
+				line: 1,
+				character: 0,
 			},
 		}
 	}

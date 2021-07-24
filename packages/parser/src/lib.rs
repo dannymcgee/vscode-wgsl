@@ -15,12 +15,14 @@ pub mod ast;
 mod error;
 mod flat_tokens;
 mod range_utils;
+mod rename;
 #[macro_use]
 mod macros;
 
 pub use flat_tokens::*;
 pub use pest;
 pub use range_utils::*;
+pub use rename::*;
 
 use ast::*;
 
@@ -56,6 +58,8 @@ trait AstParser {
 trait AstNodeParser<'a> {
 	fn parse(self) -> Option<Decl>;
 	fn parse_directive(self) -> Decl;
+	fn parse_enable_directive(self) -> Decl;
+	fn parse_plus_import_directive(self) -> Decl;
 	fn parse_global_var_decl(self) -> Decl;
 	fn parse_variable_qualifier(self) -> Vec<Token>;
 	fn parse_global_const_decl(self) -> Decl;
@@ -131,6 +135,18 @@ impl<'a> AstNodeParser<'a> for Pair<'a, Rule> {
 	fn parse_directive(self) -> Decl {
 		use Rule::*;
 
+		let pair = self.into_inner().next().unwrap();
+
+		match pair.as_rule() {
+			enable_directive => pair.parse_enable_directive(),
+			plus_import_directive => pair.parse_plus_import_directive(),
+			_ => unreachable!(),
+		}
+	}
+
+	fn parse_enable_directive(self) -> Decl {
+		use Rule::*;
+
 		let span = self.as_span();
 		let decl = &mut ExtensionDeclBuilder::default();
 
@@ -144,6 +160,26 @@ impl<'a> AstNodeParser<'a> for Pair<'a, Rule> {
 		.unwrap();
 
 		Decl::Extension(decl)
+	}
+
+	fn parse_plus_import_directive(self) -> Decl {
+		use Rule::*;
+
+		let span = self.as_span();
+		let decl = &mut ModuleDeclBuilder::default();
+
+		let decl = fold_children!(self, decl, pair {
+			IMPORT => decl.import_keyword(Token::keyword(pair)),
+			IDENT => decl.name(Token::module(pair)),
+			FROM => decl.from_keyword(Token::keyword(pair)),
+			PATH_LITERAL => decl.path(Token::literal(pair)),
+			_ => decl,
+		})
+		.range(span.into_range())
+		.build()
+		.unwrap();
+
+		Decl::Module(decl)
 	}
 
 	fn parse_global_var_decl(self) -> Decl {
@@ -256,6 +292,11 @@ impl<'a> AstNodeParser<'a> for Pair<'a, Rule> {
 		let decl = fold_children!(self, decl, pair {
 			attribute_list => decl.attributes(pair.parse_attribute_list()),
 			STRUCT => decl.storage(Token::keyword(pair)),
+			plus_export_modifier => {
+				let mut inner = pair.into_inner();
+				let _ = inner.next().unwrap(); // `<`
+				decl.storage_modifier(Token::keyword(inner.next().unwrap()))
+			},
 			IDENT => decl.name(Token::ident(pair)),
 			struct_body_decl => decl.body(pair.parse_struct_body()),
 			_ => decl,
@@ -313,6 +354,11 @@ impl<'a> AstNodeParser<'a> for Pair<'a, Rule> {
 					match pair.as_rule() {
 						FN => {
 							func.storage(Token::keyword(pair));
+						}
+						plus_export_modifier => {
+							let mut inner = pair.into_inner();
+							let _ = inner.next().unwrap(); // `<`
+							func.storage_modifier(Token::keyword(inner.next().unwrap()));
 						}
 						IDENT => {
 							func.name(Token::function(pair));
@@ -479,20 +525,23 @@ impl<'a> AstNodeParser<'a> for Pair<'a, Rule> {
 					attribute_list => ty.attributes(pair.parse_attribute_list()),
 					BOOL | FLOAT32 | INT32 | UINT32 => ty.name(Token::keyword(pair)),
 					VEC | PTR | ARRAY | MATRIX | IDENT => ty.name(Token::typename(pair)),
-					texture_sampler_type => {
-						pair.into_inner().fold(ty, |ty, pair| match pair.as_rule() {
-							SAMPLED_TEXTURE_TYPE
-							| STORAGE_TEXTURE_TYPE
-							| MULTISAMPLED_TEXTURE_TYPE
-							| DEPTH_TEXTURE_TYPE
-							| SAMPLER_TYPE => ty.name(Token::typename(pair)),
-							texel_format | type_decl => {
-								ty.component_type(Box::new(pair.parse_type_decl()))
-							}
-							access_mode => ty.access_mode(Token::keyword(pair)),
-							_ => ty,
-						})
-					}
+					texture_sampler_type => fold_children!(pair, ty, pair {
+						SAMPLED_TEXTURE_TYPE
+						| STORAGE_TEXTURE_TYPE
+						| MULTISAMPLED_TEXTURE_TYPE
+						| DEPTH_TEXTURE_TYPE
+						| SAMPLER_TYPE => ty.name(Token::typename(pair)),
+						texel_format | type_decl => {
+							ty.component_type(Box::new(pair.parse_type_decl()))
+						},
+						access_mode => ty.access_mode(Token::keyword(pair)),
+						_ => ty,
+					}),
+					plus_namespaced_type => fold_children!(pair, ty, pair {
+						namespace => ty.namespace(Token::module(pair)),
+						IDENT => ty.name(Token::ident(pair)),
+						_ => ty,
+					}),
 					type_decl => ty.component_type(Box::new(pair.parse_type_decl())),
 					storage_class => ty.storage_class(Token::keyword(pair)),
 					access_mode => ty.access_mode(Token::keyword(pair)),

@@ -3,11 +3,11 @@ import { TMGrammarScope } from "@vscode-devkit/grammar";
 export const keyword: TMGrammarScope = {
 	patterns: [
 		{
-			match: /\b(if|else|loop|continu(?:e|ing)|break|return|enable)\b/,
+			match: /\b(if|else|loop|continu(?:e|ing)|break|return|enable|import|from)\b/,
 			name: "keyword.control.$1.wgsl",
 		},
 		{
-			match: /\b(struct|fn|var|let|uniform|storage|type)\b/,
+			match: /\b(struct|fn|var|let|uniform|storage|type|export)\b/,
 			name: "storage.type.$1.wgsl",
 		},
 		{

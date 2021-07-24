@@ -33,10 +33,10 @@ pub fn handle(req: lsp_server::Request, tx: Sender<Message>) {
 			})
 			.and_then(|token| documents::scopes(&uri).and_then(|scopes| scopes.find_decl(&token)))
 			.map(|decl| {
-				let result = GotoDefinitionResponse::Scalar(Location {
-					uri,
-					range: decl.ident().range(),
-				});
+				let uri = decl.uri.unwrap_or(uri);
+				let range = decl.decl.ident().range();
+
+				let result = GotoDefinitionResponse::Scalar(Location { uri, range });
 
 				json::to_value(&result).unwrap()
 			})

@@ -831,6 +831,22 @@ fn frag(in: VertexOutput) -> [[location(0)]] vec4<f32> {
 	println!("{:#?}", result.unwrap());
 }
 
+#[test]
+fn plus_import() {
+	let program = "
+enable wgsl_plus;
+import common from \"./common\";
+
+[[group(1), binding(0)]]
+var<uniform> uniforms: common::Uniforms;
+	";
+
+	let result = parse_ast(program);
+
+	assert!(result.is_ok());
+	println!("{:#?}", result.unwrap());
+}
+
 fn assert_ok(result: Result<Pairs<Rule>>) {
 	if let Err(err) = result {
 		println!("{}", err);

@@ -1,10 +1,12 @@
-import { ExtensionContext, workspace } from "vscode";
+import { ExtensionContext, Uri, workspace } from "vscode";
 import {
 	LanguageClient,
 	ProtocolRequestType,
 	TransportKind,
 } from "vscode-languageclient/node";
 import * as path from "path";
+
+import { unreadDependency } from "./extensions";
 
 let client: LanguageClient;
 
@@ -28,7 +30,14 @@ export function activate(_: ExtensionContext) {
 	});
 
 	client.start();
+
 	client.onReady().then(() => {
+		client.onNotification(unreadDependency, async params => {
+			let dependency = Uri.parse(params.dependency);
+			// TODO: report error if path is invalid
+			await workspace.openTextDocument(dependency);
+		});
+
 		client.sendRequest(new ProtocolRequestType("initialize"), {});
 	});
 }

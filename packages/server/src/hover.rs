@@ -38,7 +38,7 @@ pub fn handle(req: lsp_server::Request, tx: Sender<Message>) {
 				let result = Hover {
 					contents: HoverContents::Markup(MarkupContent {
 						kind: MarkupKind::Markdown,
-						value: format!("```\n{}\n```", decl),
+						value: format!("```\n{}\n```", decl.decl),
 					}),
 					range: Some(range),
 				};

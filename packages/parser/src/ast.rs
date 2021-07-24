@@ -116,6 +116,7 @@ pub enum Decl {
 	Function(FunctionDecl),
 	Param(FunctionParam),
 	Extension(ExtensionDecl),
+	Module(ModuleDecl),
 }
 
 impl Decl {
@@ -130,6 +131,7 @@ impl Decl {
 			Function(ref inner) => &inner.name,
 			Param(ref inner) => &inner.name,
 			Extension(ref inner) => &inner.name,
+			Module(ref inner) => &inner.name,
 		}
 	}
 }
@@ -151,6 +153,7 @@ impl fmt::Display for Decl {
 			}
 			Param(decl) => write!(f, "{}", decl),
 			Extension(decl) => write!(f, "{}", decl),
+			Module(decl) => write!(f, "{}", decl),
 		}
 	}
 }
@@ -159,6 +162,8 @@ impl fmt::Display for Decl {
 pub struct TypeDecl {
 	#[builder(setter(into, strip_option), default)]
 	pub attributes: Option<Vec<Attribute>>,
+	#[builder(setter(into, strip_option), default)]
+	pub namespace: Option<Token>,
 	pub name: Token,
 	#[builder(setter(into, strip_option), default)]
 	pub component_type: Option<Box<TypeDecl>>,
@@ -177,13 +182,21 @@ impl fmt::Debug for TypeDecl {
 		if let Some(ref attr) = self.attributes {
 			debug.field("attributes", attr);
 		}
+
+		if let Some(ref namespace) = self.namespace {
+			debug.field("namespace", namespace);
+		}
+
 		debug.field("name", &self.name);
+
 		if let Some(ref ty) = self.component_type {
 			debug.field("component_type", ty);
 		}
+
 		if let Some(ref sc) = self.storage_class {
 			debug.field("storage_class", sc);
 		}
+
 		if let Some(ref am) = self.access_mode {
 			debug.field("access_mode", am);
 		}
@@ -196,6 +209,10 @@ impl fmt::Display for TypeDecl {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		if let Some(ref attributes) = self.attributes {
 			write!(f, "{} ", attributes.pretty())?;
+		}
+
+		if let Some(ref namespace) = self.namespace {
+			write!(f, "{}::", namespace)?;
 		}
 
 		write!(f, "{}", self.name)?;
@@ -357,6 +374,8 @@ pub struct StructDecl {
 	#[builder(setter(into, strip_option), default)]
 	pub attributes: Option<Vec<Attribute>>,
 	pub storage: Token,
+	#[builder(setter(into, strip_option), default)]
+	pub storage_modifier: Option<Token>,
 	pub name: Token,
 	pub body: Vec<StructField>,
 	pub range: Range,
@@ -371,8 +390,13 @@ impl fmt::Debug for StructDecl {
 			debug.field("attributes", attr);
 		}
 
+		debug.field("storage", &self.storage);
+
+		if let Some(ref storage_modifier) = self.storage_modifier {
+			debug.field("storage_modifier", storage_modifier);
+		}
+
 		debug
-			.field("storage", &self.storage)
 			.field("name", &self.name)
 			.field("body", &self.body)
 			.finish()
@@ -385,7 +409,12 @@ impl fmt::Display for StructDecl {
 			writeln!(f, "{}", attributes.pretty())?;
 		}
 
-		writeln!(f, "{} {} {{", self.storage, self.name)?;
+		write!(f, "{}", self.storage)?;
+		if let Some(ref storage_modifier) = self.storage_modifier {
+			write!(f, "<{}>", storage_modifier)?;
+		}
+
+		writeln!(f, " {} {{", self.name)?;
 
 		for field in &self.body {
 			writeln!(f, "    {};", field)?;
@@ -435,6 +464,8 @@ pub struct FunctionDecl {
 	#[builder(setter(into, strip_option), default)]
 	pub attributes: Option<Vec<Attribute>>,
 	pub storage: Token,
+	#[builder(setter(into, strip_option), default)]
+	pub storage_modifier: Option<Token>,
 	pub name: Token,
 	pub signature: FunctionSignature,
 	pub body: (Range, Vec<Stmt>),
@@ -553,6 +584,37 @@ impl fmt::Debug for ExtensionDecl {
 impl fmt::Display for ExtensionDecl {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		write!(f, "{} {};", self.keyword, self.name)
+	}
+}
+
+#[derive(Builder, Clone)]
+pub struct ModuleDecl {
+	pub import_keyword: Token,
+	pub name: Token,
+	pub from_keyword: Token,
+	pub path: Token,
+	pub range: Range,
+}
+
+impl fmt::Debug for ModuleDecl {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		f.debug_struct("ModuleDecl")
+			.field("import_keyword", &self.import_keyword)
+			.field("name", &self.name)
+			.field("from_keyword", &self.from_keyword)
+			.field("path", &self.path)
+			.field("range", &self.range.pretty())
+			.finish()
+	}
+}
+
+impl fmt::Display for ModuleDecl {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(
+			f,
+			"{} {} {} {};",
+			self.import_keyword, self.name, self.from_keyword, self.path
+		)
 	}
 }
 

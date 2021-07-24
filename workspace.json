@@ -87,6 +87,25 @@
 					"executor": "@nxrs/cargo:clippy"
 				}
 			}
+		},
+		"wgsl_plus": {
+			"root": "packages/wgsl-plus",
+			"projectType": "library",
+			"sourceRoot": "packages/wgsl-plus/src",
+			"targets": {
+				"test": {
+					"executor": "@nxrs/cargo:test",
+					"options": {}
+				},
+				"lint": {
+					"executor": "@nxrs/cargo:clippy",
+					"options": {
+						"fix": false,
+						"failOnWarnings": true,
+						"noDeps": true
+					}
+				}
+			}
 		}
 	},
 	"cli": {

@@ -13,12 +13,15 @@ use serde_json as json;
 
 #[macro_use]
 extern crate lazy_static;
+#[macro_use]
+extern crate serde;
 
 mod capabilities;
 mod definition;
 mod diagnostics;
 mod docsym;
 mod documents;
+mod extensions;
 mod hover;
 mod semtok;
 
@@ -45,7 +48,7 @@ fn main_loop(cx: &Connection, params: json::Value) -> Result<(), Error> {
 	let rx = cx.receiver.clone();
 	let tx = cx.sender.clone();
 
-	for msg in rx {
+	for msg in rx.clone() {
 		match msg {
 			Message::Request(req) => {
 				eprintln!("[Request] {}", req.method);
@@ -63,36 +66,50 @@ fn main_loop(cx: &Connection, params: json::Value) -> Result<(), Error> {
 				}
 			}
 			Message::Response(res) => {
-				eprintln!("{:?}", res);
+				eprintln!("[Response] {:?}", res);
 			}
-			Message::Notification(notif) => {
-				eprintln!("[Notification] {}", notif.method);
+			Message::Notification(notif) => match &notif.method[..] {
+				DidOpenTextDocument::METHOD => {
+					let params = notif
+						.extract::<DidOpenTextDocumentParams>(DidOpenTextDocument::METHOD)
+						.unwrap();
 
-				match &notif.method[..] {
-					DidOpenTextDocument::METHOD => {
-						let params = notif
-							.extract::<DidOpenTextDocumentParams>(DidOpenTextDocument::METHOD)
-							.unwrap();
+					eprintln!(
+						"[Notification] {} : {}",
+						DidOpenTextDocument::METHOD,
+						&params.text_document.uri
+					);
 
-						documents::open(&params)?;
-					}
-					DidChangeTextDocument::METHOD => {
-						let params = notif
-							.extract::<DidChangeTextDocumentParams>(DidChangeTextDocument::METHOD)
-							.unwrap();
-
-						documents::update(&params)?;
-					}
-					DidCloseTextDocument::METHOD => {
-						let params = notif
-							.extract::<DidCloseTextDocumentParams>(DidCloseTextDocument::METHOD)
-							.unwrap();
-
-						documents::close(&params.text_document.uri);
-					}
-					_ => {}
+					documents::open(params, tx.clone());
 				}
-			}
+				DidChangeTextDocument::METHOD => {
+					let params = notif
+						.extract::<DidChangeTextDocumentParams>(DidChangeTextDocument::METHOD)
+						.unwrap();
+
+					eprintln!(
+						"[Notification] {} : {}",
+						DidChangeTextDocument::METHOD,
+						&params.text_document.uri
+					);
+
+					documents::update(&params)?;
+				}
+				DidCloseTextDocument::METHOD => {
+					let params = notif
+						.extract::<DidCloseTextDocumentParams>(DidCloseTextDocument::METHOD)
+						.unwrap();
+
+					eprintln!(
+						"[Notification] {} : {}",
+						DidCloseTextDocument::METHOD,
+						&params.text_document.uri
+					);
+
+					documents::close(&params.text_document.uri);
+				}
+				_ => {}
+			},
 		}
 	}
 

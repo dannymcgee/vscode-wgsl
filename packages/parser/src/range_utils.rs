@@ -50,6 +50,7 @@ impl GetRange for Decl {
 			Function(inner) => inner.range,
 			Param(inner) => inner.range,
 			Extension(inner) => inner.range,
+			Module(inner) => inner.range,
 		}
 	}
 }
