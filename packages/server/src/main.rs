@@ -93,7 +93,7 @@ fn main_loop(cx: &Connection, params: json::Value) -> Result<(), Error> {
 						&params.text_document.uri
 					);
 
-					documents::update(&params)?;
+					documents::update(&params, tx.clone())?;
 				}
 				DidCloseTextDocument::METHOD => {
 					let params = notif

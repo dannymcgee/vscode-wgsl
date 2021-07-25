@@ -56,6 +56,10 @@ impl Token {
 			Module(text, range) => (text, *range),
 		}
 	}
+
+	pub fn as_str(&self) -> &str {
+		self.borrow_inner().0
+	}
 }
 
 #[derive(Clone, Debug)]

@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc, thread, time::Duration};
 
-use anyhow::{anyhow, Result};
+use anyhow::{bail, Result};
 use crossbeam::channel::Sender;
 use dashmap::DashMap;
 use itertools::Itertools;
@@ -21,16 +21,46 @@ use crate::{
 	extensions::{UnreadDependency, UnreadDependencyParams},
 };
 
+// TODO - This module desperately needs a refactor
+
 lazy_static! {
 	static ref DOCS: Arc<DashMap<Url, Document>> = Arc::new(DashMap::default());
 	static ref PENDING: Arc<DashMap<Url, Document>> = Arc::new(DashMap::default());
 }
 
-macro_rules! docs {
-	(!$pending:ident ? $docs:ident[$key:ident] $adapter:ident => $func:ident()) => {
+fn docs() -> Arc<DashMap<Url, Document>> {
+	Arc::clone(&DOCS)
+}
+fn docs_mut() -> Arc<DashMap<Url, Document>> {
+	let count = Arc::strong_count(&DOCS);
+	if count > 1 {
+		eprintln!(
+			"!! WARNING !! accessed DOCS mutably with {} existing references",
+			count
+		);
+	}
+	Arc::clone(&DOCS)
+}
+
+fn pending() -> Arc<DashMap<Url, Document>> {
+	Arc::clone(&PENDING)
+}
+fn pending_mut() -> Arc<DashMap<Url, Document>> {
+	let count = Arc::strong_count(&PENDING);
+	if count > 1 {
+		eprintln!(
+			"!! WARNING !! accessed PENDING mutably with {} existing references",
+			count
+		);
+	}
+	Arc::clone(&PENDING)
+}
+
+macro_rules! wait_for {
+	($pending:ident, $docs:ident[$key:ident] $adapter:ident => $func:ident()) => {
 		loop {
-			if !$pending.contains_key($key) && $docs.contains_key($key) {
-				break $docs.get($key).$adapter(|entry| entry.value().$func());
+			if !$pending().contains_key($key) && $docs().contains_key($key) {
+				break $docs().get($key).$adapter(|entry| entry.value().$func());
 			}
 			thread::sleep(Duration::from_millis(10));
 		}
@@ -40,31 +70,26 @@ macro_rules! docs {
 pub fn open(params: DidOpenTextDocumentParams, tx: Sender<Message>) {
 	thread::spawn(move || {
 		let uri = &params.text_document.uri;
-		if DOCS.contains_key(uri) {
+		if docs().contains_key(uri) {
 			return;
 		}
+		let document = Document::new(uri, &params.text_document.text);
 
-		let (ready, document) = Document::new(uri, &params.text_document.text, tx);
-
-		if !ready {
-			PENDING.insert(uri.clone(), document);
+		if !document.is_ready() {
+			document.request_deps(tx);
+			pending_mut().insert(uri.clone(), document);
 		} else {
-			DOCS.insert(uri.clone(), document);
+			docs_mut().insert(uri.clone(), document);
 
-			let done = PENDING
-				.iter()
-				.filter_map(|entry| {
-					let key = entry.key();
-					let doc = entry.value();
+			let done = pending_mut()
+				.iter_mut()
+				.filter_map(|mut entry| {
+					let doc = entry.value_mut();
+					doc.update_deps();
+					doc.update_scopes();
 
-					if doc
-						.deps
-						.as_ref()
-						.unwrap()
-						.iter()
-						.all(|uri| DOCS.contains_key(uri))
-					{
-						Some(key.clone())
+					if doc.is_ready() {
+						Some(entry.key().clone())
 					} else {
 						None
 					}
@@ -72,46 +97,62 @@ pub fn open(params: DidOpenTextDocumentParams, tx: Sender<Message>) {
 				.collect_vec();
 
 			for key in done {
-				let (_, mut doc) = PENDING.remove(&key).unwrap();
-				doc.update_deps();
-
-				DOCS.insert(key, doc);
+				if let Some((_, doc)) = pending_mut().remove(&key) {
+					doc.validate();
+					docs_mut().insert(key, doc);
+				}
 			}
 		}
 	});
 }
 
 pub fn close(uri: &Url) {
-	DOCS.remove(uri);
+	docs_mut().remove(uri);
 }
 
 pub fn read(uri: &Url) -> Option<String> {
-	docs!(!PENDING ? DOCS[uri] map => read())
+	wait_for!(pending, docs[uri] map => read())
 }
 
 pub fn parse(uri: &Url) -> Option<Arc<Vec<Decl>>> {
-	docs!(!PENDING ? DOCS[uri] and_then => parse())
+	wait_for!(pending, docs[uri] and_then => parse())
 }
 
 pub fn scopes(uri: &Url) -> Option<Arc<Scopes>> {
-	docs!(!PENDING ? DOCS[uri] and_then => scopes())
+	wait_for!(pending, docs[uri] and_then => scopes())
 }
 
 pub fn tokens(uri: &Url) -> Option<Arc<Vec<Token>>> {
-	docs!(!PENDING ? DOCS[uri] and_then => tokens())
+	wait_for!(pending, docs[uri] and_then => tokens())
 }
 
-pub fn update(params: &DidChangeTextDocumentParams) -> Result<()> {
-	if let Some(mut doc) = DOCS.get_mut(&params.text_document.uri) {
-		doc.value_mut().update(&params)?;
+pub fn update(params: &DidChangeTextDocumentParams, tx: Sender<Message>) -> Result<()> {
+	let uri = &params.text_document.uri;
 
-		Ok(())
+	if let Some(mut doc) = docs_mut().get_mut(uri) {
+		doc.value_mut().update(&params)?;
+	} else if let Some(mut doc) = pending_mut().get_mut(uri) {
+		doc.value_mut().update(&params)?;
 	} else {
-		Err(anyhow!(
-			"No entry found for uri {:?}",
-			params.text_document.uri
-		))
+		bail!("No entry found for uri '{}'", uri);
 	}
+
+	if docs().contains_key(uri) && !docs().get(uri).unwrap().is_ready() {
+		let (key, doc) = docs_mut().remove(uri).unwrap();
+		doc.request_deps(tx);
+
+		pending_mut().insert(key, doc);
+	} else if pending().contains_key(uri) {
+		if pending().get(uri).unwrap().is_ready() {
+			let (key, doc) = pending_mut().remove(uri).unwrap();
+
+			docs_mut().insert(key, doc);
+		} else {
+			pending().get(uri).unwrap().request_deps(tx);
+		}
+	}
+
+	Ok(())
 }
 
 #[derive(Debug)]
@@ -125,7 +166,7 @@ struct Document {
 }
 
 impl Document {
-	fn new(uri: &Url, input: &str, tx: Sender<Message>) -> (bool, Self) {
+	fn new(uri: &Url, input: &str) -> Self {
 		let text: Rope = input.into();
 		let ast = match parser::parse_ast(input) {
 			Ok(ast) => {
@@ -140,40 +181,18 @@ impl Document {
 			}
 		};
 
-		let mut ready = true;
-		let deps = ast.as_ref().map(|ast| {
-			let deps = ast.resolve_deps(uri);
-
-			for dep in deps.iter() {
-				if !DOCS.contains_key(&dep) {
-					ready = false;
-
-					let params = UnreadDependencyParams {
-						dependency: dep.clone(),
-						dependant: uri.clone(),
-					};
-
-					tx.send(Message::Notification(Notification {
-						method: UnreadDependency::METHOD.into(),
-						params: json::to_value(&params).unwrap(),
-					}))
-					.unwrap();
-				}
-			}
-
-			Arc::new(deps)
-		});
-
-		let scopes = ast
-			.as_ref()
-			.map(|ast| Arc::new(Scopes::new(ast.clone(), uri)));
-
 		let tokens = ast.as_ref().map(|ast| {
 			let mut tokens = vec![];
 			ast.flat_tokens(&mut tokens);
 
 			Arc::new(tokens)
 		});
+
+		let deps = ast.as_ref().map(|ast| Arc::new(ast.resolve_deps(uri)));
+
+		let scopes = ast
+			.as_ref()
+			.map(|ast| Arc::new(Scopes::new(ast.clone(), uri)));
 
 		let result = Self {
 			uri: uri.clone(),
@@ -184,11 +203,11 @@ impl Document {
 			tokens,
 		};
 
-		if ready {
+		if result.is_ready() {
 			result.validate();
 		}
 
-		(ready, result)
+		result
 	}
 
 	fn read(&self) -> String {
@@ -205,6 +224,31 @@ impl Document {
 
 	fn tokens(&self) -> Option<Arc<Vec<Token>>> {
 		self.tokens.as_ref().map(|tokens| Arc::clone(&tokens))
+	}
+
+	fn is_ready(&self) -> bool {
+		self.deps
+			.as_ref()
+			.map(|deps| deps.iter().all(|dep| docs().contains_key(dep)))
+			.unwrap_or(false)
+	}
+
+	fn is_compilable(&self) -> bool {
+		self.ast
+			.as_ref()
+			.map(|ast| {
+				ast.iter().any(|decl| match decl {
+					Decl::Function(decl) => decl
+						.attributes
+						.as_ref()
+						.map(|attributes| {
+							attributes.iter().any(|attr| attr.name.as_str() == "stage")
+						})
+						.unwrap_or(false),
+					_ => false,
+				})
+			})
+			.unwrap_or(false)
 	}
 
 	fn update(&mut self, params: &DidChangeTextDocumentParams) -> Result<()> {
@@ -236,30 +280,55 @@ impl Document {
 			}
 		};
 
-		self.scopes = self
-			.ast
-			.as_ref()
-			.map(|ast| Arc::new(Scopes::new(ast.clone(), &self.uri)));
+		self.update_tokens();
+		self.update_deps();
+		self.update_scopes();
 
+		if self.is_ready() {
+			self.validate();
+		}
+
+		Ok(())
+	}
+
+	fn update_tokens(&mut self) {
 		self.tokens = self.ast.as_ref().map(|ast| {
 			let mut tokens = vec![];
 			ast.flat_tokens(&mut tokens);
 
 			Arc::new(tokens)
 		});
-
-		self.validate();
-
-		Ok(())
 	}
 
 	fn update_deps(&mut self) {
+		self.deps = self
+			.ast
+			.as_ref()
+			.map(|ast| Arc::new(ast.resolve_deps(&self.uri)));
+	}
+
+	fn update_scopes(&mut self) {
 		self.scopes = self
 			.ast
 			.as_ref()
 			.map(|ast| Arc::new(Scopes::new(ast.clone(), &self.uri)));
+	}
 
-		self.validate();
+	fn request_deps(&self, tx: Sender<Message>) {
+		if let Some(deps) = self.deps.as_ref() {
+			for dep in deps.iter().filter(|dep| !docs().contains_key(*dep)) {
+				let params = UnreadDependencyParams {
+					dependency: dep.clone(),
+					dependant: self.uri.clone(),
+				};
+
+				tx.send(Message::Notification(Notification {
+					method: UnreadDependency::METHOD.into(),
+					params: json::to_value(&params).unwrap(),
+				}))
+				.unwrap();
+			}
+		}
 	}
 
 	fn validate(&self) {
@@ -269,16 +338,13 @@ impl Document {
 				diagnostics::clear_errors(&self.uri, Some(ErrorKind::TranspileError));
 
 				match self.transpile() {
-					Ok(text) => {
-						// diagnostics::validate(self.uri.clone(), text);
-						eprintln!("Transpile result:");
-						eprintln!("---------------------------------------------------------");
-						eprintln!("{}", text);
-						eprintln!("---------------------------------------------------------");
+					Ok(text) if self.is_compilable() => {
+						diagnostics::validate(self.uri.clone(), text);
 					}
 					Err(err) => {
 						diagnostics::report_error(&self.uri, err, ErrorKind::TranspileError);
 					}
+					_ => {}
 				}
 			} else {
 				diagnostics::clear_errors(&self.uri, Some(ErrorKind::TranspileError));
@@ -337,7 +403,7 @@ impl FromAstAndUri for Scopes {
 					let dep_uri = uri.resolve_import(&path[1..path.len() - 1]);
 
 					if let Some(dep_ast) =
-						DOCS.get(&dep_uri).and_then(|entry| entry.value().parse())
+						docs().get(&dep_uri).and_then(|entry| entry.value().parse())
 					{
 						let scope = dep_ast
 							.exports()
