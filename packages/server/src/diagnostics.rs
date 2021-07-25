@@ -4,7 +4,7 @@ use std::{
 	time::Duration,
 };
 
-use crossbeam::channel::{self, Sender};
+use crossbeam::channel::{self, Sender, TrySendError::Disconnected};
 use dashmap::DashMap;
 use itertools::Itertools;
 use lsp_server::{Message, Notification};
@@ -120,7 +120,9 @@ where
 		COLLECTION.insert(uri.clone(), vec![diag]);
 	}
 
-	let _ = dirty_notifier().try_send(());
+	if let Err(Disconnected(_)) = dirty_notifier().try_send(()) {
+		panic!("Channel disconnected");
+	}
 }
 
 pub fn clear_errors(uri: &Url, kind: Option<ErrorKind>) {
@@ -150,7 +152,9 @@ pub fn clear_errors(uri: &Url, kind: Option<ErrorKind>) {
 			diagnostics.clear();
 		}
 
-		let _ = dirty_notifier().try_send(());
+		if let Err(Disconnected(_)) = dirty_notifier().try_send(()) {
+			panic!("Channel disconnected");
+		}
 	}
 }
 
@@ -159,7 +163,7 @@ fn publish() {
 		let uri = entry.key().clone();
 		let diagnostics = entry.value().clone();
 
-		let _ = tx().send(Message::Notification(Notification {
+		tx().send(Message::Notification(Notification {
 			method: PublishDiagnostics::METHOD.into(),
 			params: json::to_value(&PublishDiagnosticsParams {
 				diagnostics,
@@ -167,7 +171,8 @@ fn publish() {
 				version: None,
 			})
 			.unwrap(),
-		}));
+		}))
+		.unwrap();
 	}
 }
 

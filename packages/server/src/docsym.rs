@@ -44,11 +44,12 @@ pub fn handle(req: lsp_server::Request, tx: Sender<Message>) {
 		};
 		let result = Some(json::to_value(response.as_ref()).unwrap());
 
-		let _ = tx.send(Message::Response(Response {
+		tx.send(Message::Response(Response {
 			id,
 			result,
 			error: None,
-		}));
+		}))
+		.unwrap();
 	});
 }
 
