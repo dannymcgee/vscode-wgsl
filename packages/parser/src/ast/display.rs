@@ -177,7 +177,13 @@ impl fmt::Display for FunctionDecl {
 		if let Some(ref attributes) = self.attributes {
 			writeln!(f, "{}", attributes.pretty())?;
 		}
-		writeln!(f, "{} {}{} {{", self.storage, self.name, self.signature)?;
+
+		write!(f, "{}", self.storage)?;
+		if let Some(ref storage_modifier) = self.storage_modifier {
+			write!(f, "<{}>", storage_modifier)?;
+		}
+
+		writeln!(f, " {}{} {{", self.name, self.signature)?;
 
 		let (_, stmts) = &self.body;
 		for stmt in stmts {
@@ -476,6 +482,10 @@ impl fmt::Display for BitcastExpr {
 
 impl fmt::Display for FunctionCallExpr {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		if let Some(ref namespace) = self.namespace {
+			write!(f, "{}::", namespace)?;
+		}
+
 		write!(
 			f,
 			"{}({})",

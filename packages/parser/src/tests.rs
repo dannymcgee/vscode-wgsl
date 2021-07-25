@@ -856,6 +856,19 @@ var<uniform> uniforms: common::Uniforms;
 	println!("{:#?}", result.unwrap());
 }
 
+#[test]
+fn plus_namespaced_func_call() {
+	let src = "
+		fn main() {
+			let diffuse_strength = lib::dot_floored(in.world_normal, light_dir);
+		}";
+
+	let result = parse_ast(src);
+
+	assert!(result.is_ok());
+	println!("{:#?}", result.unwrap());
+}
+
 fn assert_ok(result: Result<Pairs<Rule>>) {
 	if let Err(err) = result {
 		println!("{}", err);

@@ -403,7 +403,9 @@ paren_expr = {
 	LPAREN ~ expression ~ RPAREN
 }
 func_call_expr = {
-	IDENT ~ argument_expr_list
+	( namespace ~ SCOPE ~ IDENT
+		| IDENT )
+	~ argument_expr_list
 }
 
 

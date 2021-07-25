@@ -394,6 +394,8 @@ pub struct BitcastExpr {
 
 #[derive(Builder, Clone, Debug)]
 pub struct FunctionCallExpr {
+	#[builder(setter(into, strip_option), default)]
+	pub namespace: Option<Token>,
 	pub ident: Token,
 	pub args: Vec<Expr>,
 	pub range: Range,

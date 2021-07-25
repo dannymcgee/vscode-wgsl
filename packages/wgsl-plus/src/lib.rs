@@ -106,6 +106,24 @@ impl ReplaceNamespaces for TypeDecl {
 	}
 }
 
+impl ReplaceNamespaces for FunctionCallExpr {
+	fn replace_namespaces(&mut self) {
+		if let Some(namespace) = self.namespace.take() {
+			let name = self.ident.clone();
+			let start_range = namespace.range();
+			let end_range = name.range();
+
+			self.ident = Token::Ident(
+				format!("{}_{}", namespace, name),
+				Range {
+					start: start_range.start,
+					end: end_range.end,
+				},
+			);
+		}
+	}
+}
+
 impl ReplaceNamespaces for Option<Box<TypeDecl>> {
 	fn replace_namespaces(&mut self) {
 		if let Some(ty) = self.as_mut() {
@@ -117,6 +135,10 @@ impl ReplaceNamespaces for Option<Box<TypeDecl>> {
 impl ReplaceNamespaces for VarDecl {
 	fn replace_namespaces(&mut self) {
 		self.type_decl.replace_namespaces();
+
+		if let Some(assignment) = self.assignment.as_mut() {
+			assignment.replace_namespaces();
+		}
 	}
 }
 
@@ -163,8 +185,64 @@ impl ReplaceNamespaces for FunctionParam {
 
 impl ReplaceNamespaces for Stmt {
 	fn replace_namespaces(&mut self) {
-		if let Stmt::Variable(decl) = self {
-			decl.replace_namespaces();
+		use Stmt::*;
+
+		match self {
+			Variable(decl) => decl.replace_namespaces(),
+			FunctionCall(expr) => expr.replace_namespaces(),
+			_ => {}
 		}
+	}
+}
+
+impl ReplaceNamespaces for Expr {
+	fn replace_namespaces(&mut self) {
+		use Expr::*;
+
+		match self {
+			Singular(expr) => expr.replace_namespaces(),
+			Binary(expr) => expr.replace_namespaces(),
+		}
+	}
+}
+
+impl ReplaceNamespaces for SingularExpr {
+	fn replace_namespaces(&mut self) {
+		self.expr.replace_namespaces();
+	}
+}
+
+impl ReplaceNamespaces for PrimaryExpr {
+	fn replace_namespaces(&mut self) {
+		use PrimaryExpr::*;
+
+		match self {
+			TypeCtor(expr) => expr.replace_namespaces(),
+			Paren(expr) => expr.replace_namespaces(),
+			Bitcast(expr) => expr.replace_namespaces(),
+			FunctionCall(expr) => expr.replace_namespaces(),
+			_ => {}
+		}
+	}
+}
+
+impl ReplaceNamespaces for TypeCtorExpr {
+	fn replace_namespaces(&mut self) {
+		for expr in self.args.iter_mut() {
+			expr.replace_namespaces();
+		}
+	}
+}
+
+impl ReplaceNamespaces for BitcastExpr {
+	fn replace_namespaces(&mut self) {
+		self.expr.replace_namespaces();
+	}
+}
+
+impl ReplaceNamespaces for BinaryExpr {
+	fn replace_namespaces(&mut self) {
+		self.lhs.replace_namespaces();
+		self.rhs.replace_namespaces();
 	}
 }

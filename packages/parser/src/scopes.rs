@@ -33,8 +33,8 @@ impl Scopes {
 			.parent_of(&token_range, ParentGranularity::Expr)
 			.unwrap();
 
-		// Special handling for dot-accessed fields of variables that bind to structs
 		if let AstNode::Expr(Expr::Singular(ref expr)) = &parent {
+			// Special handling for dot-accessed fields of variables that bind to structs
 			if let Some(PostfixExpr::Dot { ident, range, .. }) = &expr.postfix {
 				let (postfix_ident, _) = ident.borrow_inner();
 
@@ -63,6 +63,18 @@ impl Scopes {
 
 						decl.map(|decl| ScopeDecl { uri, decl })
 					});
+				}
+			}
+
+			// Special handling for namespaced function calls
+			if let PrimaryExpr::FunctionCall(ref expr) = expr.expr {
+				if expr.ident.range() == token_range && expr.namespace.is_some() {
+					let (namespace, _) = expr.namespace.as_ref().unwrap().borrow_inner();
+
+					return self
+						.namespaces
+						.get(namespace)
+						.and_then(|scope| scope.get(name));
 				}
 			}
 		}

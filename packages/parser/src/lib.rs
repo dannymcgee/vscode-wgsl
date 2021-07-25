@@ -1096,6 +1096,7 @@ impl<'a> AstNodeParser<'a> for Pair<'a, Rule> {
 		let expr = &mut FunctionCallExprBuilder::default();
 
 		fold_children!(self, expr, pair {
+			namespace => expr.namespace(Token::module(pair)),
 			IDENT => expr.ident(Token::function(pair)),
 			argument_expr_list => {
 				let args = pair
