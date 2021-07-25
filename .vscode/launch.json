@@ -5,11 +5,19 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "Run Extension",
+			"name": "Debug Client",
 			"type": "extensionHost",
 			"request": "launch",
 			"runtimeExecutable": "${execPath}",
 			"args": ["--extensionDevelopmentPath=${workspaceFolder}/dist/vscode-wgsl"]
+		},
+		{
+			"name": "Debug Server",
+			"type": "lldb",
+			"request": "attach",
+			"program": "${workspaceFolder}/dist/vscode-wgsl/server",
+			"pid": "${command:pickMyProcess}",
+			"sourceLanguages": ["rust"]
 		}
 	]
 }

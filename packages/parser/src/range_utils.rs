@@ -148,6 +148,7 @@ impl ParentsOfRange for Decl {
 						expr.parents_of(range, granularity, nodes);
 					}
 				}
+				Struct(ref decl) => decl.parents_of(range, granularity, nodes),
 				Function(ref decl) => decl.parents_of(range, granularity, nodes),
 				_ => {}
 			}
@@ -155,8 +156,28 @@ impl ParentsOfRange for Decl {
 	}
 }
 
+impl ParentsOfRange for StructDecl {
+	fn parents_of(&self, range: &Range, _: ParentGranularity, nodes: &mut Vec<AstNode>) {
+		nodes.extend(self.body.iter().filter_map(|field| {
+			if range.is_within(&field.range) {
+				Some(AstNode::Decl(Decl::Field(field.clone())))
+			} else {
+				None
+			}
+		}));
+	}
+}
+
 impl ParentsOfRange for FunctionDecl {
 	fn parents_of(&self, range: &Range, granularity: ParentGranularity, nodes: &mut Vec<AstNode>) {
+		nodes.extend(self.signature.params.iter().filter_map(|param| {
+			if range.is_within(&param.range) {
+				Some(AstNode::Decl(Decl::Param(param.clone())))
+			} else {
+				None
+			}
+		}));
+
 		let (inner_range, body) = &self.body;
 
 		if !range.is_within(inner_range) {

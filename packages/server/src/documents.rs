@@ -1,6 +1,6 @@
-use std::{collections::HashMap, slice::Iter, sync::Arc, thread, time::Duration};
+use std::{collections::HashMap, sync::Arc, thread, time::Duration};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use crossbeam::channel::Sender;
 use dashmap::DashMap;
 use itertools::Itertools;
@@ -10,8 +10,8 @@ use lsp_types::{
 	DidOpenTextDocumentParams, Range, Url,
 };
 use parser::{
-	ast::{Decl, Expr, PostfixExpr, PrimaryExpr, Stmt, Token},
-	AstNode, FlatTokens, GetRange, IsWithin, ParentGranularity, ParentOfRange, Rename,
+	ast::{Decl, Stmt, Token},
+	FlatTokens, GetRange, NamespaceScope, Scope, Scopes,
 };
 use ropey::Rope;
 use serde_json as json;
@@ -259,10 +259,10 @@ impl Document {
 			.as_ref()
 			.map(|ast| Arc::new(Scopes::new(ast.clone(), &self.uri)));
 
-		self.validate().unwrap();
+		self.validate();
 	}
 
-	fn validate(&self) -> Result<()> {
+	fn validate(&self) {
 		if let Some(ref ast) = self.ast {
 			if ast.iter().any(|decl| matches!(decl, Decl::Extension(_))) {
 				diagnostics::clear_errors(&self.uri, Some(ErrorKind::NagaValidationError));
@@ -285,111 +285,28 @@ impl Document {
 				diagnostics::validate(self.uri.clone(), self.text.to_string());
 			}
 		}
-
-		Ok(())
 	}
 
 	fn transpile(&self) -> Result<String> {
 		let ast = self
 			.ast
 			.as_ref()
-			.context("Cannot transpile an unparsed document")?;
+			.expect("Cannot transpile an unparsed document");
 
 		let scopes = self
 			.scopes
 			.as_ref()
-			.context("Cannot transpile an unparsed document")?;
+			.expect("Cannot transpile an unparsed document");
 
-		let (result, transformed) =
-			ast.iter()
-				.fold((Ok(()), vec![]), |(result, mut tree), decl| match decl {
-					Decl::Extension(_) => (result, tree),
-					Decl::Module(module) => {
-						let (module_name, _) = module.name.borrow_inner();
-						match scopes.namespaces.get(module_name) {
-							Some(inner) => {
-								let decls = inner.scope.iter().filter_map(|(decl_name, decl)| {
-									match decl.as_ref() {
-										Decl::Extension(_) => None,
-										Decl::Struct(inner) => {
-											let new_name = format!("{}_{}", module_name, decl_name);
-											Some(Decl::Struct(inner.clone().rename(new_name)))
-										}
-										Decl::Function(inner) => {
-											let new_name = format!("{}_{}", module_name, decl_name);
-											Some(Decl::Function(inner.clone().rename(new_name)))
-										}
-										_ => unreachable!(),
-									}
-								});
-								tree.extend(decls);
-								(result, tree)
-							}
-							None => {
-								let err = anyhow!("Failed to resolved module `{}`", module_name);
-								(Err(err), tree)
-							}
-						}
-					}
-					other => {
-						tree.push(other.clone());
-						(result, tree)
-					}
-				});
-
-		result.map(|_| {
-			transformed
-				.iter()
-				.map(|decl| format!("{}", decl))
-				.join("\n\n")
-		})
+		wgsl_plus::transpile_parsed(ast.clone(), scopes.as_ref())
 	}
 }
 
-pub type Scope = HashMap<String, Arc<Decl>>;
-
-#[derive(Debug)]
-pub struct NamespaceScope {
-	pub uri: Url,
-	pub scope: Scope,
+trait FromAstAndUri {
+	fn new(ast: Arc<Vec<Decl>>, uri: &Url) -> Self;
 }
 
-impl NamespaceScope {
-	pub fn get(&self, key: &str) -> Option<ScopeDecl> {
-		self.scope
-			.get(key)
-			.map(|decl| ScopeDecl::namespace(self.uri.clone(), Arc::clone(decl)))
-	}
-}
-
-// TODO: Consider moving this into the `parser` crate
-#[derive(Debug)]
-pub struct Scopes {
-	ast: Arc<Vec<Decl>>,
-	namespaces: HashMap<String, NamespaceScope>,
-	inner: Vec<(Range, Arc<Scope>)>,
-}
-
-#[derive(Debug)]
-pub struct ScopeDecl {
-	pub uri: Option<Url>,
-	pub decl: Arc<Decl>,
-}
-
-impl ScopeDecl {
-	pub fn new(decl: Arc<Decl>) -> Self {
-		ScopeDecl { uri: None, decl }
-	}
-
-	pub fn namespace(uri: Url, decl: Arc<Decl>) -> Self {
-		ScopeDecl {
-			uri: Some(uri),
-			decl,
-		}
-	}
-}
-
-impl Scopes {
+impl FromAstAndUri for Scopes {
 	fn new(ast: Arc<Vec<Decl>>, uri: &Url) -> Self {
 		if ast.is_empty() {
 			return Self {
@@ -475,100 +392,6 @@ impl Scopes {
 			namespaces,
 			inner: scopes,
 		}
-	}
-
-	pub fn find_decl(&self, token: &Token) -> Option<ScopeDecl> {
-		let (name, token_range) = token.borrow_inner();
-		let parent = self
-			.ast
-			.parent_of(&token_range, ParentGranularity::Expr)
-			.unwrap();
-
-		// Special handling for dot-accessed fields of variables that bind to structs
-		if let AstNode::Expr(Expr::Singular(ref expr)) = &parent {
-			if let Some(PostfixExpr::Dot { ident, range, .. }) = &expr.postfix {
-				let (postfix_ident, _) = ident.borrow_inner();
-
-				if token_range.is_within(&range) && postfix_ident == name {
-					let var_name = if let PrimaryExpr::Identifier(ref token) = expr.expr {
-						token
-					} else {
-						return None;
-					};
-
-					let var_decl = self.find_decl(var_name)?;
-					let struct_name = match var_decl.decl.as_ref() {
-						Decl::Var(decl) | Decl::Const(decl) => {
-							decl.type_decl.as_ref().map(|ty| &ty.name)
-						}
-						Decl::Param(decl) => Some(&decl.type_decl.name),
-						_ => None,
-					}?;
-
-					return self.find_decl(struct_name).and_then(|decl| {
-						let uri = decl.uri;
-						let decl = match decl.decl.as_ref() {
-							Decl::Struct(struct_decl) => {
-								struct_decl.body.iter().find_map(|field| {
-									if field.name.borrow_inner().0 == name {
-										Some(Arc::new(Decl::Field(field.clone())))
-									} else {
-										None
-									}
-								})
-							}
-							_ => None,
-						};
-
-						decl.map(|decl| ScopeDecl { uri, decl })
-					});
-				}
-			}
-		}
-
-		// Special handling for namespaced types
-		match &parent {
-			AstNode::Decl(ref decl) => match decl {
-				Decl::Var(inner) => {
-					if let Some((namespace, _)) = inner.type_decl.as_ref().and_then(|ty| {
-						if ty.name.range() == token_range {
-							ty.namespace.as_ref().map(|token| token.borrow_inner())
-						} else {
-							None
-						}
-					}) {
-						return self
-							.namespaces
-							.get(namespace)
-							.and_then(|scope| scope.get(name));
-					}
-				}
-				Decl::Param(_inner) => {
-					// TODO
-				}
-				_ => {}
-			},
-			AstNode::Stmt(ref _stmt) => {
-				// TODO
-			}
-			AstNode::Expr(ref _expr) => {
-				// TODO
-			}
-		}
-
-		// Find the inner-most scope that encapsulates the token's range, and look up the
-		// declaration of the token's identifier
-		self.inner.iter().find_map(|(scope_range, scope)| {
-			if token_range.is_within(scope_range) {
-				scope.get(name).map(|decl| ScopeDecl::new(Arc::clone(decl)))
-			} else {
-				None
-			}
-		})
-	}
-
-	pub fn iter(&self) -> Iter<'_, (Range, Arc<Scope>)> {
-		self.inner.iter()
 	}
 }
 

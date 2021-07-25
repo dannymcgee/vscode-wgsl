@@ -214,12 +214,7 @@ impl FlatTokens for IfStmt {
 		}
 
 		if let Some(ref elseif) = self.elseif {
-			tokens.push(elseif.keyword.clone());
-			elseif.condition.flat_tokens(tokens);
-
-			for stmt in &elseif.body {
-				stmt.flat_tokens(tokens);
-			}
+			elseif.flat_tokens(tokens);
 		}
 
 		if let Some(ref else_stmt) = self.else_stmt {
@@ -228,6 +223,21 @@ impl FlatTokens for IfStmt {
 			for stmt in &else_stmt.body {
 				stmt.flat_tokens(tokens);
 			}
+		}
+	}
+}
+
+impl FlatTokens for ElseifStmt {
+	fn flat_tokens(&self, tokens: &mut Vec<Token>) {
+		tokens.push(self.keyword.clone());
+		self.condition.flat_tokens(tokens);
+
+		for stmt in &self.body {
+			stmt.flat_tokens(tokens);
+		}
+
+		if let Some(ref elseif) = self.elseif {
+			elseif.flat_tokens(tokens);
 		}
 	}
 }

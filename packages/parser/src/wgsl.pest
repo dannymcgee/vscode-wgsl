@@ -364,6 +364,7 @@ BINOP = ${
 	| MODULO
 	| PLUS
 	| MINUS
+	| EQUAL
 }
 
 expression = {
@@ -495,7 +496,7 @@ for_stmt = {
 for_header = {
 	( variable_stmt | assignment_stmt | func_call_stmt )? ~ SEMICOLON
 	~ expression? ~ SEMICOLON
-	~ ( assignment_stmt | func_call_stmt )?
+	~ ( expression )?
 }
 
 return_stmt = {

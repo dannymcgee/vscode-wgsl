@@ -13,16 +13,20 @@ use std::result;
 
 pub mod ast;
 mod error;
+mod find_type_decl;
 mod flat_tokens;
 mod range_utils;
 mod rename;
+mod scopes;
 #[macro_use]
 mod macros;
 
+pub use find_type_decl::*;
 pub use flat_tokens::*;
 pub use pest;
 pub use range_utils::*;
 pub use rename::*;
+pub use scopes::*;
 
 use ast::*;
 
@@ -671,8 +675,7 @@ impl<'a> AstNodeParser<'a> for Pair<'a, Rule> {
 				stmt.condition(Box::new(expr))
 			},
 			compound_stmt => stmt.body(pair.parse_compound_stmt()),
-			// FIXME
-			elseif_stmt => panic!("Please un-nest the elseif stmts, it makes me sad"),
+			elseif_stmt => stmt.elseif(Box::new(pair.parse_elseif_stmt())),
 			_ => unreachable!(),
 		})
 		.range(span.into_range())
@@ -831,23 +834,16 @@ impl<'a> AstNodeParser<'a> for Pair<'a, Rule> {
 				header
 			},
 			variable_stmt => header.init(Box::new(Stmt::Variable(pair.parse_variable_stmt()))),
-			assignment_stmt => {
-				let stmt = Box::new(Stmt::Assignment(pair.parse_assignment_stmt()));
+			assignment_stmt => header.init(Box::new(Stmt::Assignment(pair.parse_assignment_stmt()))),
+			func_call_stmt => header.init(Box::new(Stmt::FunctionCall(pair.parse_function_call_expr()))),
+			expression => {
+				let expr = Box::new(pair.parse_expression());
 				if processed < 2 {
-					header.init(stmt)
+					header.condition(expr)
 				} else {
-					header.iterator(stmt)
+					header.iterator(expr)
 				}
 			},
-			func_call_expr => {
-				let stmt = Box::new(Stmt::FunctionCall(pair.parse_function_call_expr()));
-				if processed < 2 {
-					header.init(stmt)
-				} else {
-					header.iterator(stmt)
-				}
-			},
-			expression => header.condition(Box::new(pair.parse_expression())),
 			_ => unreachable!(),
 		})
 		.range(span.into_range())

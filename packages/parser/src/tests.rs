@@ -197,6 +197,8 @@ fn if_stmt() {
 				return;
 			} elseif (true) {
 				return;
+			} elseif (2 + 2 == 5) {
+				return;
 			} else {}",
 		),
 	];
@@ -566,6 +568,13 @@ fn ast_if_stmt() {
 		"if (false) {
 			return;
 		} elseif (true) {
+			return;
+		} else {}",
+		"if (false) {
+			return;
+		} elseif (true) {
+			return;
+		} elseif (2 + 2 == 5) {
 			return;
 		} else {}",
 	];

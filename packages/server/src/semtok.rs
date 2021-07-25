@@ -8,10 +8,10 @@ use lsp_types::{
 	SemanticToken, SemanticTokenModifier as TMod, SemanticTokenType as TType, SemanticTokens,
 	SemanticTokensLegend, SemanticTokensParams, Url,
 };
-use parser::{ast::Token, GetRange};
+use parser::{ast::Token, GetRange, Scopes};
 use serde_json as json;
 
-use crate::documents::{self, Scopes};
+use crate::documents;
 
 pub fn handle(req: lsp_server::Request, tx: Sender<Message>) {
 	thread::spawn(move || {
