@@ -309,6 +309,10 @@ impl FlatTokens for ForStmt {
 
 impl FlatTokens for FunctionCallExpr {
 	fn flat_tokens(&self, tokens: &mut Vec<Token>) {
+		if let Some(ref namespace) = self.namespace {
+			tokens.push(namespace.clone());
+		}
+
 		tokens.push(self.ident.clone());
 
 		for arg in &self.args {
