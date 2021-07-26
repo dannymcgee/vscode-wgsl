@@ -77,19 +77,13 @@ pub(crate) unsafe fn bootstrap(tx: Sender<Message>) {
 pub fn validate(uri: Url, content: String) {
 	thread::spawn(move || match VALIDATOR.lock() {
 		Ok(mut validator) => match wgsl::parse_str(&content) {
-			Ok(ref module) => {
-				self::clear_errors(&uri, Some(ErrorKind::NagaParseError));
-
-				match validator.validate(module) {
-					Ok(_) => self::clear_errors(&uri, Some(ErrorKind::NagaValidationError)),
-					Err(err) => {
-						self::clear_errors(&uri, Some(ErrorKind::NagaValidationError));
-						self::report_error(&uri, err, ErrorKind::NagaValidationError);
-					}
+			Ok(ref module) => match validator.validate(module) {
+				Ok(_) => {}
+				Err(err) => {
+					self::report_error(&uri, err, ErrorKind::NagaValidationError);
 				}
-			}
+			},
 			Err(err) => {
-				self::clear_errors(&uri, Some(ErrorKind::NagaParseError));
 				self::report_error(&uri, err, ErrorKind::NagaParseError);
 			}
 		},
@@ -125,32 +119,9 @@ where
 	}
 }
 
-pub fn clear_errors(uri: &Url, kind: Option<ErrorKind>) {
+pub fn clear_errors(uri: &Url) {
 	if let Some(mut entry) = COLLECTION.get_mut(uri) {
-		let diagnostics = entry.value_mut();
-
-		if let Some(kind) = kind {
-			let idxes = diagnostics
-				.iter()
-				.enumerate()
-				.filter_map(|(idx, diag)| {
-					let diag_kind_value = diag.data.as_ref().unwrap().clone();
-					let diag_kind = json::from_value::<ErrorKind>(diag_kind_value).unwrap();
-
-					if diag_kind == kind {
-						Some(idx)
-					} else {
-						None
-					}
-				})
-				.collect_vec();
-
-			for idx in idxes {
-				diagnostics.swap_remove(idx);
-			}
-		} else {
-			diagnostics.clear();
-		}
+		entry.value_mut().clear();
 
 		if let Err(Disconnected(_)) = dirty_notifier().try_send(()) {
 			panic!("Channel disconnected");
@@ -339,12 +310,32 @@ impl IntoDiagnostic for wgsl::ParseError {
 	}
 }
 
+impl IntoDiagnostic for wgsl_plus::TranspileError {
+	fn into_diagnostic(self, kind: ErrorKind, _: Option<&Url>, _: Option<&str>) -> Diagnostic {
+		use wgsl_plus::TranspileError::*;
+
+		let range = match self {
+			UnknownNamespace(ref token) => token.range(),
+			UnresolvedModule(ref token) => token.range(),
+			Multiple(_) => panic!(
+				"TranspileError::Multiple must be unwrapped and converted into multiple diagnostics"
+			),
+		};
+
+		DiagnosticBuilder::new(kind)
+			.range(range)
+			.severity(DiagnosticSeverity::Error)
+			.message(format!("TranspileError: {}", self))
+			.build()
+	}
+}
+
 impl IntoDiagnostic for anyhow::Error {
 	fn into_diagnostic(self, kind: ErrorKind, _: Option<&Url>, _: Option<&str>) -> Diagnostic {
 		DiagnosticBuilder::new(kind)
 			.range(Range::first_line())
 			.severity(DiagnosticSeverity::Error)
-			.message(format!("TranspileError: {}", self))
+			.message(format!("Error: {}", self))
 			.build()
 	}
 }

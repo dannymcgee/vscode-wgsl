@@ -169,14 +169,9 @@ impl Document {
 	fn new(uri: &Url, input: &str) -> Self {
 		let text: Rope = input.into();
 		let ast = match parser::parse_ast(input) {
-			Ok(ast) => {
-				diagnostics::clear_errors(uri, Some(ErrorKind::ParseError));
-				Some(Arc::new(ast))
-			}
+			Ok(ast) => Some(Arc::new(ast)),
 			Err(err) => {
-				diagnostics::clear_errors(uri, Some(ErrorKind::ParseError));
 				diagnostics::report_error(uri, err, ErrorKind::ParseError);
-
 				None
 			}
 		};
@@ -252,6 +247,8 @@ impl Document {
 	}
 
 	fn update(&mut self, params: &DidChangeTextDocumentParams) -> Result<()> {
+		diagnostics::clear_errors(&self.uri);
+
 		for update in &params.content_changes {
 			let range = update.range.unwrap();
 
@@ -268,14 +265,9 @@ impl Document {
 		}
 
 		self.ast = match parser::parse_ast(&self.text.to_string()) {
-			Ok(ast) => {
-				diagnostics::clear_errors(&self.uri, Some(ErrorKind::ParseError));
-				Some(Arc::new(ast))
-			}
+			Ok(ast) => Some(Arc::new(ast)),
 			Err(err) => {
-				diagnostics::clear_errors(&self.uri, Some(ErrorKind::ParseError));
 				diagnostics::report_error(&self.uri, err, ErrorKind::ParseError);
-
 				None
 			}
 		};
@@ -334,26 +326,29 @@ impl Document {
 	fn validate(&self) {
 		if let Some(ref ast) = self.ast {
 			if ast.iter().any(|decl| matches!(decl, Decl::Extension(_))) {
-				diagnostics::clear_errors(&self.uri, Some(ErrorKind::NagaValidationError));
-				diagnostics::clear_errors(&self.uri, Some(ErrorKind::TranspileError));
+				use wgsl_plus::TranspileError::*;
 
 				match self.transpile() {
 					Ok(text) if self.is_compilable() => {
-						diagnostics::validate(self.uri.clone(), text);
+						diagnostics::validate(self.uri.clone(), text)
 					}
-					Err(err) => {
-						diagnostics::report_error(&self.uri, err, ErrorKind::TranspileError);
+					Err(Multiple(errs)) => {
+						for err in errs {
+							diagnostics::report_error(&self.uri, err, ErrorKind::TranspileError);
+						}
+					}
+					Err(single) => {
+						diagnostics::report_error(&self.uri, single, ErrorKind::TranspileError)
 					}
 					_ => {}
 				}
 			} else {
-				diagnostics::clear_errors(&self.uri, Some(ErrorKind::TranspileError));
 				diagnostics::validate(self.uri.clone(), self.text.to_string());
 			}
 		}
 	}
 
-	fn transpile(&self) -> Result<String> {
+	fn transpile(&self) -> wgsl_plus::Result<String> {
 		let ast = self
 			.ast
 			.as_ref()
