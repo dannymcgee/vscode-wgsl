@@ -47,7 +47,7 @@ fn get_semantic_tokens(uri: Url) -> SemanticTokens {
 		.iter()
 		.enumerate()
 		.map(|(idx, token)| {
-			let (token_type, token_modifiers_bitset) = scopes.get_token_type(&token);
+			let (token_type, token_modifiers_bitset) = scopes.get_token_type(token);
 			let (text, _) = token.borrow_inner();
 
 			SemanticToken {

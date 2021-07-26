@@ -38,7 +38,7 @@ impl Scopes {
 			if let Some(PostfixExpr::Dot { ident, range, .. }) = &expr.postfix {
 				let (postfix_ident, _) = ident.borrow_inner();
 
-				if token_range.is_within(&range) && postfix_ident == name {
+				if token_range.is_within(range) && postfix_ident == name {
 					let var_name = if let PrimaryExpr::Identifier(ref token) = expr.expr {
 						token
 					} else {

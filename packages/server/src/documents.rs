@@ -15,6 +15,7 @@ use parser::{
 };
 use ropey::Rope;
 use serde_json as json;
+use wgsl_plus::{GetExports, ResolveDeps, ResolveImportPath};
 
 use crate::{
 	diagnostics::{self, ErrorKind},
@@ -130,9 +131,9 @@ pub fn update(params: &DidChangeTextDocumentParams, tx: Sender<Message>) -> Resu
 	let uri = &params.text_document.uri;
 
 	if let Some(mut doc) = docs_mut().get_mut(uri) {
-		doc.value_mut().update(&params)?;
+		doc.value_mut().update(params)?;
 	} else if let Some(mut doc) = pending_mut().get_mut(uri) {
-		doc.value_mut().update(&params)?;
+		doc.value_mut().update(params)?;
 	} else {
 		bail!("No entry found for uri '{}'", uri);
 	}
@@ -210,15 +211,15 @@ impl Document {
 	}
 
 	fn parse(&self) -> Option<Arc<Vec<Decl>>> {
-		self.ast.as_ref().map(|ast| Arc::clone(&ast))
+		self.ast.as_ref().map(|ast| Arc::clone(ast))
 	}
 
 	fn scopes(&self) -> Option<Arc<Scopes>> {
-		self.scopes.as_ref().map(|scopes| Arc::clone(&scopes))
+		self.scopes.as_ref().map(|scopes| Arc::clone(scopes))
 	}
 
 	fn tokens(&self) -> Option<Arc<Vec<Token>>> {
-		self.tokens.as_ref().map(|tokens| Arc::clone(&tokens))
+		self.tokens.as_ref().map(|tokens| Arc::clone(tokens))
 	}
 
 	fn is_ready(&self) -> bool {
@@ -406,13 +407,10 @@ impl FromAstAndUri for Scopes {
 							.map(|decl| (decl.ident().to_string(), Arc::new(decl)))
 							.collect();
 
-						namespaces.insert(
-							name,
-							NamespaceScope {
-								uri: dep_uri.clone(),
-								scope,
-							},
-						);
+						namespaces.insert(name, NamespaceScope {
+							uri: dep_uri.clone(),
+							scope,
+						});
 					}
 				}
 				_ => {
@@ -453,80 +451,5 @@ impl FromAstAndUri for Scopes {
 			namespaces,
 			inner: scopes,
 		}
-	}
-}
-
-trait ResolveDeps {
-	fn resolve_deps(&self, source: &Url) -> Vec<Url>;
-}
-
-impl ResolveDeps for Vec<Decl> {
-	fn resolve_deps(&self, source: &Url) -> Vec<Url> {
-		self.iter()
-			.filter_map(|decl| match decl {
-				Decl::Module(inner) => {
-					let (quoted, _) = inner.path.borrow_inner();
-					let slice = &quoted[1..quoted.len() - 1];
-					let uri = source.resolve_import(slice);
-
-					Some(uri)
-				}
-				_ => None,
-			})
-			.collect()
-	}
-}
-
-trait GetExports {
-	fn exports(&self) -> Vec<Decl>;
-}
-
-impl GetExports for Vec<Decl> {
-	fn exports(&self) -> Vec<Decl> {
-		self.iter()
-			.filter(|decl| match decl {
-				Decl::Struct(inner) => inner.storage_modifier.as_ref().map_or(false, |token| {
-					let (kw, _) = token.borrow_inner();
-					kw == "export"
-				}),
-				Decl::Function(inner) => inner.storage_modifier.as_ref().map_or(false, |token| {
-					let (kw, _) = token.borrow_inner();
-					kw == "export"
-				}),
-				_ => false,
-			})
-			.cloned()
-			.collect()
-	}
-}
-
-trait ResolveImportPath {
-	fn resolve_import(&self, path: &str) -> Url;
-}
-
-impl ResolveImportPath for Url {
-	fn resolve_import(&self, path: &str) -> Self {
-		let mut resolved = self.clone();
-		{
-			let resolved_segs = &mut resolved.path_segments_mut().unwrap();
-			resolved_segs.pop();
-
-			let segments = path.split('/');
-			for segment in segments {
-				match segment {
-					"." => {}
-					".." => {
-						resolved_segs.pop();
-					}
-					other => {
-						resolved_segs.push(other);
-					}
-				}
-			}
-		}
-
-		resolved.set_path(&format!("{}.wgsl", resolved.path()));
-
-		resolved
 	}
 }

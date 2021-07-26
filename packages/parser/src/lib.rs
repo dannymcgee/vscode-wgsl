@@ -74,8 +74,7 @@ trait AstNodeParser<'a> {
 	fn parse_param_list(self) -> Vec<FunctionParam>;
 	fn parse_attribute_list(self) -> Vec<Attribute>;
 	fn parse_variable_ident_decl<F>(self, token_ctor: F) -> (Token, TypeDecl)
-	where
-		F: Fn(Pair<'a, Rule>) -> Token;
+	where F: Fn(Pair<'a, Rule>) -> Token;
 	fn parse_type_decl(self) -> TypeDecl;
 	fn parse_const_expr(self) -> PrimaryExpr;
 	fn parse_compound_stmt(self) -> Vec<Stmt>;
@@ -482,9 +481,7 @@ impl<'a> AstNodeParser<'a> for Pair<'a, Rule> {
 	}
 
 	fn parse_variable_ident_decl<F>(self, token_ctor: F) -> (Token, TypeDecl)
-	where
-		F: Fn(Pair<'a, Rule>) -> Token,
-	{
+	where F: Fn(Pair<'a, Rule>) -> Token {
 		use Rule::*;
 
 		let mut ident_token = None;

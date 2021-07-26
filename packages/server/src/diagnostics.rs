@@ -33,6 +33,7 @@ lazy_static! {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[allow(clippy::enum_variant_names)]
 pub enum ErrorKind {
 	ParseError,
 	TranspileError,
@@ -92,9 +93,7 @@ pub fn validate(uri: Url, content: String) {
 }
 
 pub fn report_error<E>(uri: &Url, err: E, kind: ErrorKind)
-where
-	E: IntoDiagnostic,
-{
+where E: IntoDiagnostic {
 	let diag = match kind {
 		ErrorKind::ParseError => err.into_diagnostic(kind, None, None),
 		ErrorKind::TranspileError => err.into_diagnostic(kind, None, None), // TODO
@@ -180,9 +179,7 @@ impl DiagnosticBuilder {
 	}
 
 	fn message<S>(mut self, message: S) -> Self
-	where
-		S: ToString,
-	{
+	where S: ToString {
 		self.message = Some(message.to_string());
 		self
 	}

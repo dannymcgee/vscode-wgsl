@@ -71,12 +71,14 @@
 					"executor": "@nxrs/cargo:build",
 					"options": {
 						"outDir": "dist/vscode-wgsl",
-						"release": false
+						"release": false,
+						"toolchain": "nightly"
 					},
 					"configurations": {
 						"production": {
 							"outDir": "dist/vscode-wgsl",
-							"release": true
+							"release": true,
+							"toolchain": "nightly"
 						}
 					}
 				},
