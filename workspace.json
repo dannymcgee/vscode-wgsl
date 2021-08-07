@@ -17,6 +17,13 @@
 						"package": false,
 						"install": false
 					}
+				},
+				"lint": {
+					"executor": "@nrwl/linter:eslint",
+					"options": {
+						"lintFilePatterns": ["packages/client/**/*.ts"],
+						"maxWarnings": 0
+					}
 				}
 			}
 		},
@@ -38,14 +45,6 @@
 					"options": {
 						"lintFilePatterns": ["packages/grammar/**/*.ts"]
 					}
-				},
-				"test": {
-					"executor": "@nrwl/jest:jest",
-					"outputs": ["coverage/packages/grammar"],
-					"options": {
-						"jestConfig": "packages/grammar/jest.config.js",
-						"passWithNoTests": true
-					}
 				}
 			}
 		},
@@ -58,7 +57,12 @@
 					"executor": "@nxrs/cargo:test"
 				},
 				"lint": {
-					"executor": "@nxrs/cargo:clippy"
+					"executor": "@nxrs/cargo:clippy",
+					"options": {
+						"fix": false,
+						"failOnWarnings": true,
+						"noDeps": true
+					}
 				}
 			}
 		},
@@ -86,7 +90,12 @@
 					"executor": "@nxrs/cargo:test"
 				},
 				"lint": {
-					"executor": "@nxrs/cargo:clippy"
+					"executor": "@nxrs/cargo:clippy",
+					"options": {
+						"fix": false,
+						"failOnWarnings": true,
+						"noDeps": true
+					}
 				}
 			}
 		},
