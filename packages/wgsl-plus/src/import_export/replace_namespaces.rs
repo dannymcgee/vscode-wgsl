@@ -79,6 +79,10 @@ impl ReplaceNamespaces for FunctionCallExpr {
 				end: end_range.end,
 			});
 		}
+
+		for arg in self.args.iter_mut() {
+			arg.replace_namespaces(namespaces, accum_result);
+		}
 	}
 }
 
