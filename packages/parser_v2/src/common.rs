@@ -33,7 +33,75 @@ impl<'a> Parse<'a> for AttributeList<'a> {
 	type Stream = ParseStream<'a>;
 
 	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
-		todo!()
+		use Token::*;
+
+		let open_brace = input.consume(brace!["[["])?;
+
+		let mut attributes = vec![];
+		loop {
+			match input.peek() {
+				Some(Ident(_, _)) => {
+					attributes.push(input.parse()?);
+				}
+				Some(Punct(",", _)) => {
+					input.next().unwrap();
+					continue;
+				}
+				Some(Brace("]]", _)) => break,
+				Some(other) => {
+					return Err(SpannedError {
+						message: "Expected attribute, `,`, or `]]`".into(),
+						span: Some(other.span()),
+						source: input.source(),
+					})
+				}
+				None => {
+					return Err(SpannedError {
+						message: "Unexpected end of input".into(),
+						source: input.source(),
+						span: None,
+					})
+				}
+			};
+		}
+
+		let close_brace = input.consume(brace!["]]"])?;
+
+		Ok(Self {
+			open_brace,
+			attributes,
+			close_brace,
+			span: open_brace.span().through(close_brace.span()),
+		})
+	}
+}
+
+impl<'a> Parse<'a> for Attribute<'a> {
+	type Stream = ParseStream<'a>;
+
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
+		let name = input.consume_kind(TokenKind::Ident)?;
+		let value = if input.check(brace!["("]) {
+			input.consume(brace!["("])?;
+			let value = input.next().ok_or_else(|| SpannedError {
+				message: "Unexpected end of input".into(),
+				source: input.source(),
+				span: None,
+			})?;
+			input.consume(brace![")"])?;
+
+			Some(value)
+		} else {
+			None
+		};
+
+		let span = if let Some(value) = value {
+			name.span().through(value.span())
+		} else {
+			name.span()
+		};
+
+		Ok(Self { name, value, span })
 	}
 }
 
