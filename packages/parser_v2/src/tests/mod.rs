@@ -1,1 +1,2 @@
+mod decl;
 mod lexer;
