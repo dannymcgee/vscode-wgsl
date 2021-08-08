@@ -37,6 +37,9 @@
 		"parser": {
 			"tags": []
 		},
+		"parser_v2": {
+			"tags": []
+		},
 		"server": {
 			"tags": []
 		},

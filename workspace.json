@@ -66,6 +66,25 @@
 				}
 			}
 		},
+		"parser_v2": {
+			"root": "packages/parser_v2",
+			"projectType": "library",
+			"sourceRoot": "packages/parser_v2/src",
+			"targets": {
+				"test": {
+					"executor": "@nxrs/cargo:test",
+					"options": {}
+				},
+				"lint": {
+					"executor": "@nxrs/cargo:clippy",
+					"options": {
+						"fix": false,
+						"failOnWarnings": true,
+						"noDeps": true
+					}
+				}
+			}
+		},
 		"server": {
 			"root": "packages/server",
 			"projectType": "application",

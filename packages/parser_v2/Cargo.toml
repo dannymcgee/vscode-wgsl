@@ -1,0 +1,14 @@
+[package]
+name = "parser_v2"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+gramatika = "*"
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "lexer"
+harness = false
