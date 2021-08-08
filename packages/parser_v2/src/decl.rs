@@ -37,6 +37,7 @@ pub struct TypeAliasDecl<'a> {
 	pub name: Token<'a>,
 	pub eq: Token<'a>,
 	pub value: TypeDecl<'a>,
+	pub semicolon: Token<'a>,
 	pub span: Span,
 }
 
@@ -46,8 +47,16 @@ pub struct StructDecl<'a> {
 	pub storage: Token<'a>,
 	pub storage_modifier: Option<Token<'a>>,
 	pub name: Token<'a>,
-	pub body: Vec<FieldDecl<'a>>,
+	pub body: StructBody<'a>,
 	pub semicolon: Token<'a>,
+	pub span: Span,
+}
+
+#[derive(DebugLisp)]
+pub struct StructBody<'a> {
+	pub open_brace: Token<'a>,
+	pub fields: Vec<FieldDecl<'a>>,
+	pub close_brace: Token<'a>,
 	pub span: Span,
 }
 
@@ -56,6 +65,7 @@ pub struct FieldDecl<'a> {
 	pub attributes: Option<AttributeList<'a>>,
 	pub name: Token<'a>,
 	pub ty: TypeDecl<'a>,
+	pub semicolon: Token<'a>,
 	pub span: Span,
 }
 
@@ -175,7 +185,21 @@ impl<'a> Parse<'a> for TypeAliasDecl<'a> {
 	type Stream = ParseStream<'a>;
 
 	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
-		todo!()
+		let storage = input.consume(keyword![type])?;
+		let name = input.consume_kind(TokenKind::Ident)?;
+		let eq = input.consume(operator![=])?;
+		let value = input.parse()?;
+		let semicolon = input.consume(punct![;])?;
+		let span = storage.span().through(semicolon.span());
+
+		Ok(Self {
+			storage,
+			name,
+			eq,
+			value,
+			semicolon,
+			span,
+		})
 	}
 }
 
@@ -183,7 +207,108 @@ impl<'a> Parse<'a> for StructDecl<'a> {
 	type Stream = ParseStream<'a>;
 
 	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
-		todo!()
+		let storage = input.consume(keyword![struct])?;
+
+		let storage_modifier = if input.check(operator![<]) {
+			input.consume(operator![<])?;
+			let modifier = input.consume_kind(TokenKind::Keyword)?;
+			input.consume(operator![>])?;
+
+			Some(modifier)
+		} else {
+			None
+		};
+
+		let name = input.consume_kind(TokenKind::Ident)?;
+		let body = input.parse()?;
+		let semicolon = input.consume(punct![;])?;
+		let span = storage.span().through(semicolon.span());
+
+		Ok(Self {
+			attributes: None, // TODO
+			storage,
+			storage_modifier,
+			name,
+			body,
+			semicolon,
+			span,
+		})
+	}
+}
+
+impl<'a> Parse<'a> for StructBody<'a> {
+	type Stream = ParseStream<'a>;
+
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
+		use Token::*;
+
+		let open_brace = input.consume(brace!["{"])?;
+
+		let mut fields = vec![];
+		loop {
+			match input.peek() {
+				Some(Brace("[[", _)) | Some(Ident(_, _)) => {
+					fields.push(input.parse()?);
+				}
+				Some(Brace("}", _)) => {
+					break;
+				}
+				Some(other) => {
+					return Err(SpannedError {
+						message: "Expected field declaration".into(),
+						span: Some(other.span()),
+						source: input.source(),
+					})
+				}
+				None => {
+					return Err(SpannedError {
+						message: "Unexpected end of input".into(),
+						source: input.source(),
+						span: None,
+					})
+				}
+			};
+		}
+
+		let close_brace = input.consume(brace!["}"])?;
+		let span = open_brace.span().through(close_brace.span());
+
+		Ok(Self {
+			open_brace,
+			fields,
+			close_brace,
+			span,
+		})
+	}
+}
+
+impl<'a> Parse<'a> for FieldDecl<'a> {
+	type Stream = ParseStream<'a>;
+
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
+		let attributes = if input.check(brace!["[["]) {
+			Some(input.parse::<AttributeList>()?)
+		} else {
+			None
+		};
+		let name = input.consume_kind(TokenKind::Ident)?;
+		let ty = input.parse()?;
+		let semicolon = input.consume(punct![;])?;
+
+		let span_start = attributes
+			.as_ref()
+			.map(|attr| attr.open_brace)
+			.unwrap_or(name)
+			.span();
+		let span = span_start.through(semicolon.span());
+
+		Ok(Self {
+			attributes,
+			name,
+			ty,
+			semicolon,
+			span,
+		})
 	}
 }
 
