@@ -3,6 +3,7 @@ use gramatika::{Parse, ParseStreamer, Span, SpannedError, Token as _};
 use crate::{
 	common::{AttributeList, TypeDecl},
 	expr::Expr,
+	stmt::Stmt,
 	ParseStream, Token, TokenKind, *,
 };
 
@@ -77,6 +78,7 @@ pub struct FunctionDecl<'a> {
 	pub name: Token<'a>,
 	pub params: Vec<ParamDecl<'a>>,
 	pub return_ty: Option<TypeDecl<'a>>,
+	pub body: Stmt<'a>,
 	pub span: Span,
 }
 
@@ -316,7 +318,97 @@ impl<'a> Parse<'a> for FunctionDecl<'a> {
 	type Stream = ParseStream<'a>;
 
 	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
-		todo!()
+		use Token::*;
+
+		let storage = input.consume(keyword![fn])?;
+		let storage_modifier = if input.check(operator![<]) {
+			input.consume(operator![<])?;
+			let modifier = input.consume_kind(TokenKind::Keyword)?;
+			input.consume(operator![>])?;
+
+			Some(modifier)
+		} else {
+			None
+		};
+		let name = input.consume_kind(TokenKind::Ident)?;
+		input.consume(brace!["("])?;
+
+		let mut params = vec![];
+		loop {
+			match input.peek() {
+				Some(Brace("[[", _) | Ident(_, _)) => {
+					params.push(input.parse::<ParamDecl>()?);
+				}
+				Some(Punct(",", _)) => {
+					input.next().unwrap();
+					continue;
+				}
+				Some(Brace(")", _)) => break,
+				Some(other) => {
+					return Err(SpannedError {
+						message: "Expected parameter, `,`, or `)`".into(),
+						span: Some(other.span()),
+						source: input.source(),
+					})
+				}
+				None => {
+					return Err(SpannedError {
+						message: "Unexpected end of input".into(),
+						source: input.source(),
+						span: None,
+					})
+				}
+			};
+		}
+
+		input.consume(brace![")"])?;
+		let return_ty = if input.check(operator![->]) {
+			Some(input.parse::<TypeDecl>()?)
+		} else {
+			None
+		};
+
+		let body = input.parse::<Stmt>()?;
+		let span = storage.span().through(body.span());
+
+		Ok(Self {
+			attributes: None, // TODO
+			storage,
+			storage_modifier,
+			name,
+			params,
+			return_ty,
+			body,
+			span,
+		})
+	}
+}
+
+impl<'a> Parse<'a> for ParamDecl<'a> {
+	type Stream = ParseStream<'a>;
+
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
+		let attributes = if input.check(brace!["[["]) {
+			Some(input.parse::<AttributeList>()?)
+		} else {
+			None
+		};
+		let name = input.consume_kind(TokenKind::Ident)?;
+		let ty = input.parse::<TypeDecl>()?;
+
+		let span_start = attributes
+			.as_ref()
+			.map(|attr| attr.open_brace)
+			.unwrap_or(name)
+			.span();
+		let span = span_start.through(ty.span);
+
+		Ok(Self {
+			attributes,
+			name,
+			ty,
+			span,
+		})
 	}
 }
 

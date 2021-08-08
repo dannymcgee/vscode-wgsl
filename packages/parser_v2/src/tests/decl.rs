@@ -1,4 +1,4 @@
-use crate::decl::{StructDecl, TypeAliasDecl, VarDecl};
+use crate::decl::{FunctionDecl, StructDecl, TypeAliasDecl, VarDecl};
 
 #[test]
 fn var_decl() {
@@ -11,7 +11,7 @@ fn var_decl() {
 
 #[test]
 fn type_alias_decl() {
-	super::parse::<TypeAliasDecl>("type ViewProjectionMatrix = vec4<f32>;");
+	super::parse::<TypeAliasDecl>("type ViewProjectionMatrix = mat4x4<f32>;");
 }
 
 #[test]
@@ -32,6 +32,33 @@ struct VertexOutput {
 	[[location(1)]] world_normal: vec3<f32>;
 	[[location(2)]] world_position: vec3<f32>;
 };
+	"#,
+	);
+}
+
+#[test]
+fn function_decl() {
+	super::parse::<FunctionDecl>(
+		r#"
+fn main() -> [[location(0)]] vec4<f32> {
+	return vec4<f32>(0.4, 0.4, 0.8, 1.0);
+}
+	"#,
+	);
+	super::parse::<FunctionDecl>(
+		r#"
+fn main(
+	[[builtin(position)]] coord_in: vec4<f32>,
+) -> [[location(0)]] vec4<f32> {
+	return vec4<f32>(coord_in.x, coord_in.y, 0.0, 1.0);
+}
+	"#,
+	);
+	super::parse::<FunctionDecl>(
+		r#"
+fn mul(a: f32, b: f32) -> f32 {
+	return a * b;
+}
 	"#,
 	);
 }

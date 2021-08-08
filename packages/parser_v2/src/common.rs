@@ -19,7 +19,7 @@ pub struct Attribute<'a> {
 
 #[derive(DebugLisp)]
 pub struct TypeDecl<'a> {
-	pub colon: Option<Token<'a>>,
+	pub annotator: Option<Token<'a>>,
 	pub attributes: Option<AttributeList<'a>>,
 	pub namespace: Option<Token<'a>>,
 	pub name: Token<'a>,
@@ -108,7 +108,7 @@ impl<'a> Parse<'a> for Attribute<'a> {
 #[derive(Default)]
 struct TypeDeclBuilder<'a> {
 	attributes: Option<AttributeList<'a>>,
-	colon: Option<Token<'a>>,
+	annotator: Option<Token<'a>>,
 	namespace: Option<Token<'a>>,
 	name: Option<Token<'a>>,
 	child_ty: Option<Token<'a>>,
@@ -124,8 +124,8 @@ impl<'a> TypeDeclBuilder<'a> {
 		self.attributes = Some(attributes);
 		self
 	}
-	fn colon(&mut self, colon: Token<'a>) -> &mut Self {
-		self.colon = Some(colon);
+	fn annotator(&mut self, colon: Token<'a>) -> &mut Self {
+		self.annotator = Some(colon);
 		self
 	}
 	fn namespace(&mut self, namespace: Option<Token<'a>>) -> &mut Self {
@@ -150,7 +150,7 @@ impl<'a> TypeDeclBuilder<'a> {
 	}
 	fn build(self) -> TypeDecl<'a> {
 		let first = self
-			.colon
+			.annotator
 			.or_else(|| self.attributes.as_ref().map(|attr| attr.open_brace))
 			.or(self.namespace)
 			.or(self.name)
@@ -166,7 +166,7 @@ impl<'a> TypeDeclBuilder<'a> {
 		let span = first.span().through(last.span());
 
 		TypeDecl {
-			colon: self.colon,
+			annotator: self.annotator,
 			attributes: self.attributes,
 			namespace: self.namespace,
 			name: self.name.unwrap(),
@@ -185,8 +185,8 @@ impl<'a> Parse<'a> for TypeDecl<'a> {
 		use Token::*;
 		let mut builder = TypeDeclBuilder::new();
 
-		if input.check(punct![:]) {
-			builder.colon(input.consume(punct![:])?);
+		if input.check(punct![:]) || input.check(operator![->]) {
+			builder.annotator(input.next().unwrap());
 		}
 		if input.check(brace!["[["]) {
 			builder.attributes(input.parse()?);
