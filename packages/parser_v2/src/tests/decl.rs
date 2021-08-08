@@ -1,4 +1,4 @@
-use crate::decl::{FunctionDecl, StructDecl, TypeAliasDecl, VarDecl};
+use crate::decl::{Decl, FunctionDecl, StructDecl, TypeAliasDecl, VarDecl};
 
 #[test]
 fn var_decl() {
@@ -59,6 +59,33 @@ fn main(
 fn mul(a: f32, b: f32) -> f32 {
 	return a * b;
 }
+	"#,
+	);
+}
+
+#[test]
+fn attribute_insertion() {
+	super::parse::<Decl>(
+		r#"
+[[stage(vertex)]]
+fn vert(model: VertexInput) -> VertexOutput {
+	// ...
+}
+	"#,
+	);
+	super::parse::<Decl>(
+		r#"
+[[group(0), binding(0)]]
+var<uniform> uniforms: common::Uniforms;
+	"#,
+	);
+	super::parse::<Decl>(
+		r#"
+[[block]]
+struct<export> Uniforms {
+	view_pos: vec4<f32>;
+	view_proj: mat4x4<f32>;
+};
 	"#,
 	);
 }

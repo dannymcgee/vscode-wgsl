@@ -113,6 +113,33 @@ impl<'a> Parse<'a> for Decl<'a> {
 		use Token::*;
 
 		match input.peek() {
+			Some(Brace("[[", _)) => {
+				let attributes = Some(input.parse::<AttributeList>()?);
+
+				match input.parse::<Decl>()? {
+					Decl::Var(mut inner) => {
+						inner.attributes = attributes;
+						Ok(Decl::Var(inner))
+					}
+					Decl::Const(mut inner) => {
+						inner.attributes = attributes;
+						Ok(Decl::Const(inner))
+					}
+					Decl::Struct(mut inner) => {
+						inner.attributes = attributes;
+						Ok(Decl::Struct(inner))
+					}
+					Decl::Function(mut inner) => {
+						inner.attributes = attributes;
+						Ok(Decl::Function(inner))
+					}
+					_ => Err(SpannedError {
+						message: "Attributes are not valid in this position".into(),
+						span: Some(attributes.unwrap().span),
+						source: input.source(),
+					}),
+				}
+			}
 			Some(Keyword("var", _)) => Ok(Decl::Var(input.parse()?)),
 			Some(Keyword("let", _)) => Ok(Decl::Const(input.parse()?)),
 			Some(Keyword("type", _)) => Ok(Decl::TypeAlias(input.parse()?)),
