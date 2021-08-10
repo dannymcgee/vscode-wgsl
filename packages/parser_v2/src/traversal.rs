@@ -1,3 +1,5 @@
+use gramatika::Token as _;
+
 use crate::{
 	common::{AttributeList, TypeDecl},
 	decl::{
@@ -64,333 +66,384 @@ pub trait Visitor<'a> {
 	fn visit_ident_expr(&mut self, expr: &IdentExpr<'a>) {}
 }
 
-// FIXME:
-// Instead of individual `walk_x` methods, create a `Walk` trait with a single
-// `fn walk(&self, visitor: &mut dyn Visitor)` method, and implement it for each node type.
-// That will allow a visitor to selectively `walk` individual children of a node while
-// returning `FlowControl::Break` from the parent's `visit_x` method.
-impl<'a> SyntaxTree<'a> {
-	pub fn walk(&self, visitor: &mut dyn Visitor<'a>) {
+pub trait Walk<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>);
+}
+
+impl<'a> Walk<'a> for SyntaxTree<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
 		for decl in self.inner.iter() {
-			self.walk_decl(decl, visitor);
+			decl.walk(visitor);
 		}
 	}
+}
 
-	fn walk_decl(&self, decl: &Decl<'a>, visitor: &mut dyn Visitor<'a>) {
+// --- Declarations ----------------------------------------------------------------------
+
+impl<'a> Walk<'a> for Decl<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
 		use Decl::*;
 
-		if visitor.visit_decl(decl) == FlowControl::Continue {
-			match decl {
-				Var(decl) | Const(decl) => self.walk_var_decl(decl, visitor),
-				TypeAlias(decl) => self.walk_type_alias_decl(decl, visitor),
-				Struct(decl) => self.walk_struct_decl(decl, visitor),
-				Field(decl) => self.walk_field_decl(decl, visitor),
-				Function(decl) => self.walk_func_decl(decl, visitor),
-				Param(decl) => self.walk_param_decl(decl, visitor),
-				Extension(decl) => self.walk_extension_decl(decl, visitor),
-				Module(decl) => self.walk_module_decl(decl, visitor),
+		if visitor.visit_decl(self) == FlowControl::Continue {
+			match self {
+				Var(decl) | Const(decl) => decl.walk(visitor),
+				TypeAlias(decl) => decl.walk(visitor),
+				Struct(decl) => decl.walk(visitor),
+				Field(decl) => decl.walk(visitor),
+				Function(decl) => decl.walk(visitor),
+				Param(decl) => decl.walk(visitor),
+				Extension(decl) => decl.walk(visitor),
+				Module(decl) => decl.walk(visitor),
 			}
 		}
 	}
+}
 
-	fn walk_var_decl(&self, decl: &VarDecl<'a>, visitor: &mut dyn Visitor<'a>) {
-		if visitor.visit_var_decl(decl) == FlowControl::Continue {
-			if let Some(ref attributes) = decl.attributes {
+impl<'a> Walk<'a> for VarDecl<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
+		if visitor.visit_var_decl(self) == FlowControl::Continue {
+			if let Some(ref attributes) = self.attributes {
 				visitor.visit_attributes(attributes);
 			}
 
-			if let Some(ref ty) = decl.ty {
-				self.walk_type(ty, visitor);
+			if let Some(ref ty) = self.ty {
+				ty.walk(visitor);
 			}
 
-			if let Some(ref expr) = decl.assignment {
-				self.walk_expr(expr, visitor);
-			}
-		}
-	}
-
-	fn walk_type_alias_decl(&self, decl: &TypeAliasDecl<'a>, visitor: &mut dyn Visitor<'a>) {
-		if visitor.visit_type_alias_decl(decl) == FlowControl::Continue {
-			self.walk_type(&decl.value, visitor);
-		}
-	}
-
-	fn walk_struct_decl(&self, decl: &StructDecl<'a>, visitor: &mut dyn Visitor<'a>) {
-		if visitor.visit_struct_decl(decl) == FlowControl::Continue {
-			for field in decl.body.fields.iter() {
-				self.walk_field_decl(field, visitor);
+			if let Some(ref expr) = self.assignment {
+				expr.walk(visitor);
 			}
 		}
 	}
+}
 
-	fn walk_field_decl(&self, decl: &FieldDecl<'a>, visitor: &mut dyn Visitor<'a>) {
-		if visitor.visit_field_decl(decl) == FlowControl::Continue {
-			self.walk_type(&decl.ty, visitor);
+impl<'a> Walk<'a> for TypeAliasDecl<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
+		if visitor.visit_type_alias_decl(self) == FlowControl::Continue {
+			self.value.walk(visitor);
 		}
 	}
+}
 
-	fn walk_func_decl(&self, decl: &FunctionDecl<'a>, visitor: &mut dyn Visitor<'a>) {
-		if visitor.visit_func_decl(decl) == FlowControl::Continue {
-			for param in decl.params.iter() {
-				self.walk_param_decl(param, visitor);
-			}
-
-			if let Some(ref ty) = decl.return_ty {
-				self.walk_type(ty, visitor);
-			}
-
-			for stmt in decl.body.stmts.iter() {
-				self.walk_stmt(stmt, visitor);
+impl<'a> Walk<'a> for StructDecl<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
+		if visitor.visit_struct_decl(self) == FlowControl::Continue {
+			for field in self.body.fields.iter() {
+				field.walk(visitor);
 			}
 		}
 	}
+}
 
-	fn walk_param_decl(&self, decl: &ParamDecl<'a>, visitor: &mut dyn Visitor<'a>) {
-		if visitor.visit_param_decl(decl) == FlowControl::Continue {
-			self.walk_type(&decl.ty, visitor);
+impl<'a> Walk<'a> for FieldDecl<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
+		if visitor.visit_field_decl(self) == FlowControl::Continue {
+			self.ty.walk(visitor);
 		}
 	}
+}
 
-	fn walk_extension_decl(&self, decl: &ExtensionDecl<'a>, visitor: &mut dyn Visitor<'a>) {
-		visitor.visit_extension_decl(decl);
-	}
-
-	fn walk_module_decl(&self, decl: &ModuleDecl<'a>, visitor: &mut dyn Visitor<'a>) {
-		visitor.visit_module_decl(decl);
-	}
-
-	fn walk_type(&self, ty: &TypeDecl<'a>, visitor: &mut dyn Visitor<'a>) {
-		if visitor.visit_type(ty) == FlowControl::Continue {
-			if let Some(ref attributes) = ty.attributes {
-				visitor.visit_attributes(attributes);
+impl<'a> Walk<'a> for FunctionDecl<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
+		if visitor.visit_func_decl(self) == FlowControl::Continue {
+			for param in self.params.iter() {
+				param.walk(visitor);
 			}
 
-			visitor.visit_ident_expr(&ty.name);
+			if let Some(ref ty) = self.return_ty {
+				ty.walk(visitor);
+			}
+
+			for stmt in self.body.stmts.iter() {
+				stmt.walk(visitor);
+			}
 		}
 	}
+}
 
-	fn walk_stmt(&self, stmt: &Stmt<'a>, visitor: &mut dyn Visitor<'a>) {
+impl<'a> Walk<'a> for ParamDecl<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
+		if visitor.visit_param_decl(self) == FlowControl::Continue {
+			self.ty.walk(visitor);
+		}
+	}
+}
+
+impl<'a> Walk<'a> for ExtensionDecl<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
+		visitor.visit_extension_decl(self);
+	}
+}
+
+impl<'a> Walk<'a> for ModuleDecl<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
+		visitor.visit_module_decl(self);
+	}
+}
+
+// --- Statements ------------------------------------------------------------------------
+
+impl<'a> Walk<'a> for Stmt<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
 		use Stmt::*;
 
-		if visitor.visit_stmt(stmt) == FlowControl::Continue {
-			match stmt {
+		if visitor.visit_stmt(self) == FlowControl::Continue {
+			match self {
 				Block(stmt) => {
 					for stmt in stmt.stmts.iter() {
-						self.walk_stmt(stmt, visitor);
+						stmt.walk(visitor);
 					}
 				}
-				Return(stmt) => self.walk_return_stmt(stmt, visitor),
-				If(stmt) => self.walk_if_stmt(stmt, visitor),
-				Switch(stmt) => self.walk_switch_stmt(stmt, visitor),
-				Loop(stmt) => self.walk_loop_stmt(stmt, visitor),
-				Continuing(stmt) => self.walk_continuing_stmt(stmt, visitor),
-				For(stmt) => self.walk_for_stmt(stmt, visitor),
-				Var(decl) => self.walk_var_decl(decl, visitor),
-				Expr(stmt) => self.walk_expr_stmt(stmt, visitor),
+				Return(stmt) => stmt.walk(visitor),
+				If(stmt) => stmt.walk(visitor),
+				Switch(stmt) => stmt.walk(visitor),
+				Loop(stmt) => stmt.walk(visitor),
+				Continuing(stmt) => stmt.walk(visitor),
+				For(stmt) => stmt.walk(visitor),
+				Var(decl) => decl.walk(visitor),
+				Expr(stmt) => stmt.walk(visitor),
 				_ => {}
 			}
 		}
 	}
+}
 
-	fn walk_return_stmt(&self, stmt: &ReturnStmt<'a>, visitor: &mut dyn Visitor<'a>) {
-		if visitor.visit_return_stmt(stmt) == FlowControl::Continue {
-			if let Some(ref expr) = stmt.value {
-				self.walk_expr(expr, visitor);
+impl<'a> Walk<'a> for ReturnStmt<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
+		if visitor.visit_return_stmt(self) == FlowControl::Continue {
+			if let Some(ref expr) = self.value {
+				expr.walk(visitor);
 			}
 		}
 	}
+}
 
-	fn walk_if_stmt(&self, stmt: &IfStmt<'a>, visitor: &mut dyn Visitor<'a>) {
-		if visitor.visit_if_stmt(stmt) == FlowControl::Continue {
-			self.walk_expr(&stmt.condition, visitor);
+impl<'a> Walk<'a> for IfStmt<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
+		let visit_method = match self.keyword.lexeme() {
+			"if" => Visitor::visit_if_stmt,
+			"elseif" => Visitor::visit_elseif_stmt,
+			_ => unreachable!(),
+		};
 
-			for stmt in stmt.then_branch.stmts.iter() {
-				self.walk_stmt(stmt, visitor);
+		if visit_method(visitor, self) == FlowControl::Continue {
+			self.condition.walk(visitor);
+
+			for stmt in self.then_branch.stmts.iter() {
+				stmt.walk(visitor);
 			}
 
-			if let Some(ref stmt) = stmt.elseif_branch {
-				self.walk_elseif_stmt(stmt, visitor);
+			if let Some(ref stmt) = self.elseif_branch {
+				stmt.walk(visitor);
 			}
 
-			if let Some(ref stmt) = stmt.else_branch {
-				self.walk_else_stmt(stmt, visitor);
-			}
-		}
-	}
-
-	fn walk_elseif_stmt(&self, stmt: &IfStmt<'a>, visitor: &mut dyn Visitor<'a>) {
-		if visitor.visit_elseif_stmt(stmt) == FlowControl::Continue {
-			self.walk_expr(&stmt.condition, visitor);
-
-			for stmt in stmt.then_branch.stmts.iter() {
-				self.walk_stmt(stmt, visitor);
-			}
-
-			if let Some(ref stmt) = stmt.elseif_branch {
-				self.walk_elseif_stmt(stmt, visitor);
-			}
-
-			if let Some(ref stmt) = stmt.else_branch {
-				self.walk_else_stmt(stmt, visitor);
+			if let Some(ref stmt) = self.else_branch {
+				stmt.walk(visitor);
 			}
 		}
 	}
+}
 
-	fn walk_else_stmt(&self, stmt: &ElseStmt<'a>, visitor: &mut dyn Visitor<'a>) {
-		if visitor.visit_else_stmt(stmt) == FlowControl::Continue {
-			for stmt in stmt.body.stmts.iter() {
-				self.walk_stmt(stmt, visitor);
+impl<'a> Walk<'a> for ElseStmt<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
+		if visitor.visit_else_stmt(self) == FlowControl::Continue {
+			for stmt in self.body.stmts.iter() {
+				stmt.walk(visitor);
 			}
 		}
 	}
+}
 
-	fn walk_switch_stmt(&self, stmt: &SwitchStmt<'a>, visitor: &mut dyn Visitor<'a>) {
-		if visitor.visit_switch_stmt(stmt) == FlowControl::Continue {
-			self.walk_expr(&stmt.subject, visitor);
+impl<'a> Walk<'a> for SwitchStmt<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
+		if visitor.visit_switch_stmt(self) == FlowControl::Continue {
+			self.subject.walk(visitor);
 
-			for stmt in stmt.body.cases.iter() {
-				self.walk_case_stmt(stmt, visitor);
+			for stmt in self.body.cases.iter() {
+				stmt.walk(visitor);
 			}
 		}
 	}
+}
 
-	fn walk_case_stmt(&self, stmt: &CaseStmt<'a>, visitor: &mut dyn Visitor<'a>) {
-		if visitor.visit_case_stmt(stmt) == FlowControl::Continue {
-			for stmt in stmt.body.stmts.iter() {
-				self.walk_stmt(stmt, visitor);
+impl<'a> Walk<'a> for CaseStmt<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
+		if visitor.visit_case_stmt(self) == FlowControl::Continue {
+			for stmt in self.body.stmts.iter() {
+				stmt.walk(visitor);
 			}
 		}
 	}
+}
 
-	fn walk_loop_stmt(&self, stmt: &LoopStmt<'a>, visitor: &mut dyn Visitor<'a>) {
-		if visitor.visit_loop_stmt(stmt) == FlowControl::Continue {
-			for stmt in stmt.body.stmts.iter() {
-				self.walk_stmt(stmt, visitor);
+impl<'a> Walk<'a> for LoopStmt<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
+		if visitor.visit_loop_stmt(self) == FlowControl::Continue {
+			for stmt in self.body.stmts.iter() {
+				stmt.walk(visitor);
 			}
 		}
 	}
+}
 
-	fn walk_continuing_stmt(&self, stmt: &ContinuingStmt<'a>, visitor: &mut dyn Visitor<'a>) {
-		if visitor.visit_continuing_stmt(stmt) == FlowControl::Continue {
-			for stmt in stmt.body.stmts.iter() {
-				self.walk_stmt(stmt, visitor);
+impl<'a> Walk<'a> for ContinuingStmt<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
+		if visitor.visit_continuing_stmt(self) == FlowControl::Continue {
+			for stmt in self.body.stmts.iter() {
+				stmt.walk(visitor);
 			}
 		}
 	}
+}
 
-	fn walk_for_stmt(&self, stmt: &ForStmt<'a>, visitor: &mut dyn Visitor<'a>) {
-		if visitor.visit_for_stmt(stmt) == FlowControl::Continue {
-			if let Some(ref stmt) = stmt.initializer {
-				self.walk_stmt(stmt, visitor);
+impl<'a> Walk<'a> for ForStmt<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
+		if visitor.visit_for_stmt(self) == FlowControl::Continue {
+			if let Some(ref stmt) = self.initializer {
+				stmt.walk(visitor);
 			}
 
-			if let Some(ref expr) = stmt.condition {
-				self.walk_stmt(expr.as_ref(), visitor);
+			if let Some(ref expr) = self.condition {
+				expr.walk(visitor);
 			}
 
-			if let Some(ref expr) = stmt.increment {
-				self.walk_expr(expr, visitor);
+			if let Some(ref expr) = self.increment {
+				expr.walk(visitor);
 			}
 
-			for stmt in stmt.body.stmts.iter() {
-				self.walk_stmt(stmt, visitor);
+			for stmt in self.body.stmts.iter() {
+				stmt.walk(visitor);
 			}
 		}
 	}
+}
 
-	fn walk_expr_stmt(&self, stmt: &ExprStmt<'a>, visitor: &mut dyn Visitor<'a>) {
-		if visitor.visit_expr_stmt(stmt) == FlowControl::Continue {
-			self.walk_expr(&stmt.expr, visitor);
+impl<'a> Walk<'a> for ExprStmt<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
+		if visitor.visit_expr_stmt(self) == FlowControl::Continue {
+			self.expr.walk(visitor);
 		}
 	}
+}
 
-	fn walk_expr(&self, expr: &Expr<'a>, visitor: &mut dyn Visitor<'a>) {
+// --- Expressions -----------------------------------------------------------------------
+
+impl<'a> Walk<'a> for Expr<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
 		use Expr::*;
 
-		if visitor.visit_expr(expr) == FlowControl::Continue {
-			match expr {
-				Unary(expr) => self.walk_unary_expr(expr, visitor),
-				Binary(expr) => self.walk_binary_expr(expr, visitor),
-				Assignment(expr) => self.walk_assignment_expr(expr, visitor),
-				FnCall(expr) => self.walk_fn_call_expr(expr, visitor),
-				TypeCtor(expr) => self.walk_type_ctor_expr(expr, visitor),
-				Group(expr) => self.walk_group_expr(expr, visitor),
-				Bitcast(expr) => self.walk_bitcast_expr(expr, visitor),
+		if visitor.visit_expr(self) == FlowControl::Continue {
+			match self {
+				Unary(expr) => expr.walk(visitor),
+				Binary(expr) => expr.walk(visitor),
+				Assignment(expr) => expr.walk(visitor),
+				FnCall(expr) => expr.walk(visitor),
+				TypeCtor(expr) => expr.walk(visitor),
+				Group(expr) => expr.walk(visitor),
+				Bitcast(expr) => expr.walk(visitor),
 				Literal(expr) => visitor.visit_literal_expr(expr),
 				Ident(expr) => visitor.visit_ident_expr(expr),
-				Primary(expr) => self.walk_primary_expr(expr, visitor),
+				Primary(expr) => expr.walk(visitor),
 			};
 		}
 	}
+}
 
-	fn walk_unary_expr(&self, expr: &UnaryExpr<'a>, visitor: &mut dyn Visitor<'a>) {
-		if visitor.visit_unary_expr(expr) == FlowControl::Continue {
-			self.walk_expr(&expr.expr, visitor);
+impl<'a> Walk<'a> for UnaryExpr<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
+		if visitor.visit_unary_expr(self) == FlowControl::Continue {
+			self.expr.walk(visitor);
 		}
 	}
+}
 
-	fn walk_binary_expr(&self, expr: &BinaryExpr<'a>, visitor: &mut dyn Visitor<'a>) {
-		if visitor.visit_binary_expr(expr) == FlowControl::Continue {
-			self.walk_expr(&expr.lhs, visitor);
-			self.walk_expr(&expr.rhs, visitor);
+impl<'a> Walk<'a> for BinaryExpr<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
+		let visit_method = match self.op.lexeme() {
+			"=" => Visitor::visit_assignment_expr,
+			_ => Visitor::visit_binary_expr,
+		};
+
+		if visit_method(visitor, self) == FlowControl::Continue {
+			self.lhs.walk(visitor);
+			self.rhs.walk(visitor);
 		}
 	}
+}
 
-	fn walk_assignment_expr(&self, expr: &BinaryExpr<'a>, visitor: &mut dyn Visitor<'a>) {
-		if visitor.visit_assignment_expr(expr) == FlowControl::Continue {
-			self.walk_expr(&expr.lhs, visitor);
-			self.walk_expr(&expr.rhs, visitor);
-		}
-	}
-
-	fn walk_primary_expr(&self, expr: &PrimaryExpr<'a>, visitor: &mut dyn Visitor<'a>) {
-		if visitor.visit_primary_expr(expr) == FlowControl::Continue {
-			self.walk_expr(&expr.expr, visitor);
-
-			if let Some(ref expr) = expr.postfix {
-				self.walk_postfix_expr(expr, visitor);
+impl<'a> Walk<'a> for FnCallExpr<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
+		if visitor.visit_fn_call_expr(self) == FlowControl::Continue {
+			for arg in self.arguments.arguments.iter() {
+				arg.walk(visitor);
 			}
 		}
 	}
+}
 
-	fn walk_postfix_expr(&self, expr: &PostfixExpr<'a>, visitor: &mut dyn Visitor<'a>) {
-		if visitor.visit_postfix_expr(expr) == FlowControl::Continue {
-			self.walk_expr(&expr.expr, visitor);
+impl<'a> Walk<'a> for TypeCtorExpr<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
+		if visitor.visit_type_ctor_expr(self) == FlowControl::Continue {
+			self.ty.walk(visitor);
 
-			if let Some(ref expr) = expr.postfix {
-				self.walk_postfix_expr(expr, visitor);
+			for arg in self.arguments.arguments.iter() {
+				arg.walk(visitor);
 			}
 		}
 	}
+}
 
-	fn walk_type_ctor_expr(&self, expr: &TypeCtorExpr<'a>, visitor: &mut dyn Visitor<'a>) {
-		if visitor.visit_type_ctor_expr(expr) == FlowControl::Continue {
-			self.walk_type(&expr.ty, visitor);
+impl<'a> Walk<'a> for GroupExpr<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
+		if visitor.visit_group_expr(self) == FlowControl::Continue {
+			self.expr.walk(visitor);
+		}
+	}
+}
 
-			for arg in expr.arguments.arguments.iter() {
-				self.walk_expr(arg, visitor);
+impl<'a> Walk<'a> for BitcastExpr<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
+		if visitor.visit_bitcast_expr(self) == FlowControl::Continue {
+			self.ty.walk(visitor);
+			self.expr.walk(visitor);
+		}
+	}
+}
+
+impl<'a> Walk<'a> for PrimaryExpr<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
+		if visitor.visit_primary_expr(self) == FlowControl::Continue {
+			self.expr.walk(visitor);
+
+			if let Some(ref expr) = self.postfix {
+				expr.walk(visitor);
 			}
 		}
 	}
+}
 
-	fn walk_group_expr(&self, expr: &GroupExpr<'a>, visitor: &mut dyn Visitor<'a>) {
-		if visitor.visit_group_expr(expr) == FlowControl::Continue {
-			self.walk_expr(&expr.expr, visitor);
-		}
-	}
+impl<'a> Walk<'a> for PostfixExpr<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
+		if visitor.visit_postfix_expr(self) == FlowControl::Continue {
+			self.expr.walk(visitor);
 
-	fn walk_bitcast_expr(&self, expr: &BitcastExpr<'a>, visitor: &mut dyn Visitor<'a>) {
-		if visitor.visit_bitcast_expr(expr) == FlowControl::Continue {
-			self.walk_type(&expr.ty, visitor);
-			self.walk_group_expr(&expr.expr, visitor);
-		}
-	}
-
-	fn walk_fn_call_expr(&self, expr: &FnCallExpr<'a>, visitor: &mut dyn Visitor<'a>) {
-		if visitor.visit_fn_call_expr(expr) == FlowControl::Continue {
-			for arg in expr.arguments.arguments.iter() {
-				self.walk_expr(arg, visitor);
+			if let Some(ref expr) = self.postfix {
+				expr.walk(visitor);
 			}
+		}
+	}
+}
+
+// --- Common ----------------------------------------------------------------------------
+
+impl<'a> Walk<'a> for TypeDecl<'a> {
+	fn walk(&self, visitor: &mut dyn Visitor<'a>) {
+		if visitor.visit_type(self) == FlowControl::Continue {
+			if let Some(ref attributes) = self.attributes {
+				visitor.visit_attributes(attributes);
+			}
+
+			visitor.visit_ident_expr(&self.name);
 		}
 	}
 }

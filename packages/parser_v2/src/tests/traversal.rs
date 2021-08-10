@@ -5,7 +5,7 @@ use gramatika::{ParseStreamer, Token as _};
 use crate::{
 	decl::VarDecl,
 	expr::IdentExpr,
-	traversal::{FlowControl, Visitor},
+	traversal::{FlowControl, Visitor, Walk},
 	ParseStream, SyntaxTree,
 };
 
@@ -24,7 +24,11 @@ impl<'a> Visitor<'a> for UnusedVarsVisitor {
 	fn visit_var_decl(&mut self, decl: &VarDecl<'a>) -> FlowControl {
 		self.counts.insert(decl.name.lexeme().into(), 0);
 
-		FlowControl::Continue
+		if let Some(ref expr) = decl.assignment {
+			expr.walk(self);
+		}
+
+		FlowControl::Break
 	}
 
 	fn visit_ident_expr(&mut self, expr: &IdentExpr<'a>) {
