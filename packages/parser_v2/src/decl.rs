@@ -1,9 +1,9 @@
-use gramatika::{Parse, ParseStreamer, Span, SpannedError, Token as _};
+use gramatika::{Parse, ParseStreamer, Span, Spanned, SpannedError};
 
 use crate::{
 	common::{AttributeList, TypeDecl},
 	expr::Expr,
-	stmt::Stmt,
+	stmt::BlockStmt,
 	ParseStream, Token, TokenKind, *,
 };
 
@@ -29,7 +29,6 @@ pub struct VarDecl<'a> {
 	pub ty: Option<TypeDecl<'a>>,
 	pub assignment: Option<Expr<'a>>,
 	pub semicolon: Token<'a>,
-	pub span: Span,
 }
 
 #[derive(DebugLisp)]
@@ -39,7 +38,6 @@ pub struct TypeAliasDecl<'a> {
 	pub eq: Token<'a>,
 	pub value: TypeDecl<'a>,
 	pub semicolon: Token<'a>,
-	pub span: Span,
 }
 
 #[derive(DebugLisp)]
@@ -50,7 +48,6 @@ pub struct StructDecl<'a> {
 	pub name: Token<'a>,
 	pub body: StructBody<'a>,
 	pub semicolon: Token<'a>,
-	pub span: Span,
 }
 
 #[derive(DebugLisp)]
@@ -58,7 +55,6 @@ pub struct StructBody<'a> {
 	pub open_brace: Token<'a>,
 	pub fields: Vec<FieldDecl<'a>>,
 	pub close_brace: Token<'a>,
-	pub span: Span,
 }
 
 #[derive(DebugLisp)]
@@ -67,7 +63,6 @@ pub struct FieldDecl<'a> {
 	pub name: Token<'a>,
 	pub ty: TypeDecl<'a>,
 	pub semicolon: Token<'a>,
-	pub span: Span,
 }
 
 #[derive(DebugLisp)]
@@ -78,8 +73,7 @@ pub struct FunctionDecl<'a> {
 	pub name: Token<'a>,
 	pub params: Vec<ParamDecl<'a>>,
 	pub return_ty: Option<TypeDecl<'a>>,
-	pub body: Stmt<'a>,
-	pub span: Span,
+	pub body: BlockStmt<'a>,
 }
 
 #[derive(DebugLisp)]
@@ -87,14 +81,12 @@ pub struct ParamDecl<'a> {
 	pub attributes: Option<AttributeList<'a>>,
 	pub name: Token<'a>,
 	pub ty: TypeDecl<'a>,
-	pub span: Span,
 }
 
 #[derive(DebugLisp)]
 pub struct ExtensionDecl<'a> {
 	pub keyword: Token<'a>,
 	pub name: Token<'a>,
-	pub span: Span,
 }
 
 #[derive(DebugLisp)]
@@ -103,7 +95,6 @@ pub struct ModuleDecl<'a> {
 	pub name: Token<'a>,
 	pub from_kw: Token<'a>,
 	pub path: Token<'a>,
-	pub span: Span,
 }
 
 impl<'a> Parse<'a> for Decl<'a> {
@@ -190,6 +181,8 @@ impl<'a> Parse<'a> for VarDecl<'a> {
 		};
 
 		let assignment = if input.check(operator![=]) {
+			input.next().unwrap();
+
 			Some(input.parse::<Expr>()?)
 		} else {
 			None
@@ -205,8 +198,13 @@ impl<'a> Parse<'a> for VarDecl<'a> {
 			ty,
 			assignment,
 			semicolon,
-			span: storage.span().through(semicolon.span()),
 		})
+	}
+}
+
+impl<'a> Spanned for VarDecl<'a> {
+	fn span(&self) -> Span {
+		self.storage.span().through(self.semicolon.span())
 	}
 }
 
@@ -219,7 +217,6 @@ impl<'a> Parse<'a> for TypeAliasDecl<'a> {
 		let eq = input.consume(operator![=])?;
 		let value = input.parse()?;
 		let semicolon = input.consume(punct![;])?;
-		let span = storage.span().through(semicolon.span());
 
 		Ok(Self {
 			storage,
@@ -227,8 +224,13 @@ impl<'a> Parse<'a> for TypeAliasDecl<'a> {
 			eq,
 			value,
 			semicolon,
-			span,
 		})
+	}
+}
+
+impl<'a> Spanned for TypeAliasDecl<'a> {
+	fn span(&self) -> Span {
+		self.storage.span().through(self.semicolon.span())
 	}
 }
 
@@ -251,7 +253,6 @@ impl<'a> Parse<'a> for StructDecl<'a> {
 		let name = input.consume_kind(TokenKind::Ident)?;
 		let body = input.parse()?;
 		let semicolon = input.consume(punct![;])?;
-		let span = storage.span().through(semicolon.span());
 
 		Ok(Self {
 			attributes: None, // TODO
@@ -260,8 +261,13 @@ impl<'a> Parse<'a> for StructDecl<'a> {
 			name,
 			body,
 			semicolon,
-			span,
 		})
+	}
+}
+
+impl<'a> Spanned for StructDecl<'a> {
+	fn span(&self) -> Span {
+		self.storage.span().through(self.semicolon.span())
 	}
 }
 
@@ -300,14 +306,18 @@ impl<'a> Parse<'a> for StructBody<'a> {
 		}
 
 		let close_brace = input.consume(brace!["}"])?;
-		let span = open_brace.span().through(close_brace.span());
 
 		Ok(Self {
 			open_brace,
 			fields,
 			close_brace,
-			span,
 		})
+	}
+}
+
+impl<'a> Spanned for StructBody<'a> {
+	fn span(&self) -> Span {
+		self.open_brace.span().through(self.close_brace.span())
 	}
 }
 
@@ -324,20 +334,25 @@ impl<'a> Parse<'a> for FieldDecl<'a> {
 		let ty = input.parse()?;
 		let semicolon = input.consume(punct![;])?;
 
-		let span_start = attributes
-			.as_ref()
-			.map(|attr| attr.open_brace)
-			.unwrap_or(name)
-			.span();
-		let span = span_start.through(semicolon.span());
-
 		Ok(Self {
 			attributes,
 			name,
 			ty,
 			semicolon,
-			span,
 		})
+	}
+}
+
+impl<'a> Spanned for FieldDecl<'a> {
+	fn span(&self) -> Span {
+		let span_start = self
+			.attributes
+			.as_ref()
+			.map(|attr| attr.open_brace)
+			.unwrap_or(self.name)
+			.span();
+
+		span_start.through(self.semicolon.span())
 	}
 }
 
@@ -395,8 +410,7 @@ impl<'a> Parse<'a> for FunctionDecl<'a> {
 			None
 		};
 
-		let body = input.parse::<Stmt>()?;
-		let span = storage.span().through(body.span());
+		let body = input.parse::<BlockStmt>()?;
 
 		Ok(Self {
 			attributes: None, // TODO
@@ -406,8 +420,13 @@ impl<'a> Parse<'a> for FunctionDecl<'a> {
 			params,
 			return_ty,
 			body,
-			span,
 		})
+	}
+}
+
+impl<'a> Spanned for FunctionDecl<'a> {
+	fn span(&self) -> Span {
+		self.storage.span().through(self.body.brace_close.span())
 	}
 }
 
@@ -423,26 +442,31 @@ impl<'a> Parse<'a> for ParamDecl<'a> {
 		let name = input.consume_kind(TokenKind::Ident)?;
 		let ty = input.parse::<TypeDecl>()?;
 
-		let span_start = attributes
-			.as_ref()
-			.map(|attr| attr.open_brace)
-			.unwrap_or(name)
-			.span();
-		let span = span_start.through(ty.span);
-
 		Ok(Self {
 			attributes,
 			name,
 			ty,
-			span,
 		})
+	}
+}
+
+impl<'a> Spanned for ParamDecl<'a> {
+	fn span(&self) -> Span {
+		let span_start = self
+			.attributes
+			.as_ref()
+			.map(|attr| attr.open_brace)
+			.unwrap_or(self.name)
+			.span();
+
+		span_start.through(self.ty.span)
 	}
 }
 
 impl<'a> Parse<'a> for ExtensionDecl<'a> {
 	type Stream = ParseStream<'a>;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
+	fn parse(_input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
 		todo!()
 	}
 }
@@ -450,7 +474,7 @@ impl<'a> Parse<'a> for ExtensionDecl<'a> {
 impl<'a> Parse<'a> for ModuleDecl<'a> {
 	type Stream = ParseStream<'a>;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
+	fn parse(_input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
 		todo!()
 	}
 }

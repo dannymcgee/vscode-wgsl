@@ -1,6 +1,8 @@
 mod common;
 mod decl;
+mod expr;
 mod lexer;
+mod stmt;
 
 use gramatika::{Parse, ParseStream, ParseStreamer};
 use std::fmt;

@@ -1,6 +1,6 @@
-use gramatika::{Parse, ParseStreamer, Span, SpannedError, Token as _};
+use gramatika::{Parse, ParseStreamer, Span, Spanned, SpannedError};
 
-use crate::{ParseStream, Token, TokenKind, *};
+use crate::{expr::Expr, ParseStream, Token, TokenKind, *};
 
 #[derive(DebugLisp)]
 pub struct AttributeList<'a> {
@@ -27,6 +27,13 @@ pub struct TypeDecl<'a> {
 	pub storage_class: Option<Token<'a>>,
 	pub access_mode: Option<Token<'a>>,
 	pub span: Span,
+}
+
+#[derive(DebugLisp)]
+pub struct ArgumentList<'a> {
+	pub brace_open: Token<'a>,
+	pub arguments: Vec<Expr<'a>>,
+	pub brace_close: Token<'a>,
 }
 
 impl<'a> Parse<'a> for AttributeList<'a> {
@@ -244,5 +251,42 @@ impl<'a> Parse<'a> for TypeDecl<'a> {
 		}
 
 		Ok(builder.build())
+	}
+}
+
+impl<'a> Parse<'a> for ArgumentList<'a> {
+	type Stream = ParseStream<'a>;
+
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
+		use Token::*;
+
+		let brace_open = input.consume(brace!["("])?;
+		let mut arguments = vec![];
+		loop {
+			match input.peek() {
+				Some(Punct(",", _)) => {
+					input.next().unwrap();
+					continue;
+				}
+				Some(Brace(")", _)) => break,
+				Some(_) => {
+					arguments.push(input.parse::<Expr>()?);
+				}
+				None => {
+					return Err(SpannedError {
+						message: "Unexpected end of input".into(),
+						source: input.source(),
+						span: None,
+					})
+				}
+			};
+		}
+		let brace_close = input.consume(brace![")"])?;
+
+		Ok(Self {
+			brace_open,
+			arguments,
+			brace_close,
+		})
 	}
 }
