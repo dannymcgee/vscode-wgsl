@@ -255,7 +255,7 @@ impl<'a> Parse<'a> for StructDecl<'a> {
 		let semicolon = input.consume(punct![;])?;
 
 		Ok(Self {
-			attributes: None, // TODO
+			attributes: None,
 			storage,
 			storage_modifier,
 			name,
@@ -413,7 +413,7 @@ impl<'a> Parse<'a> for FunctionDecl<'a> {
 		let body = input.parse::<BlockStmt>()?;
 
 		Ok(Self {
-			attributes: None, // TODO
+			attributes: None,
 			storage,
 			storage_modifier,
 			name,
@@ -459,22 +459,35 @@ impl<'a> Spanned for ParamDecl<'a> {
 			.unwrap_or(self.name)
 			.span();
 
-		span_start.through(self.ty.span)
+		span_start.through(self.ty.span())
 	}
 }
 
 impl<'a> Parse<'a> for ExtensionDecl<'a> {
 	type Stream = ParseStream<'a>;
 
-	fn parse(_input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
-		todo!()
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
+		let keyword = input.consume(keyword![enable])?;
+		let name = input.consume_kind(TokenKind::Ident)?;
+
+		Ok(Self { keyword, name })
 	}
 }
 
 impl<'a> Parse<'a> for ModuleDecl<'a> {
 	type Stream = ParseStream<'a>;
 
-	fn parse(_input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
-		todo!()
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
+		let import_kw = input.consume(keyword![import])?;
+		let name = input.consume_kind(TokenKind::Ident)?;
+		let from_kw = input.consume(keyword![from])?;
+		let path = input.consume_kind(TokenKind::Path)?;
+
+		Ok(Self {
+			import_kw,
+			name,
+			from_kw,
+			path,
+		})
 	}
 }

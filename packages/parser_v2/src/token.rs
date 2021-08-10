@@ -1,8 +1,8 @@
 use core::fmt;
 
-use gramatika::Span;
+use gramatika::{Span, Spanned, Token as _};
 
-#[derive(Clone, Copy, DebugLispToken, PartialEq, Token, Lexer)]
+#[derive(Clone, Copy, DebugLispToken, Token, Lexer)]
 pub enum Token<'a> {
 	#[pattern = r"\[\[?|\]\]?|[(){}]"]
 	Brace(&'a str, Span),
@@ -65,3 +65,13 @@ impl<'a> fmt::Debug for Token<'a> {
 		<Self as gramatika::DebugLisp>::fmt(self, f, 0)
 	}
 }
+
+impl<'a> PartialEq for Token<'a> {
+	fn eq(&self, other: &Self) -> bool {
+		self.kind() == other.kind()
+			&& self.lexeme() == other.lexeme()
+			&& self.span() == other.span()
+	}
+}
+
+impl<'a> Eq for Token<'a> {}

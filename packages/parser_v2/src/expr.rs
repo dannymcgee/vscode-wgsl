@@ -137,7 +137,7 @@ impl<'a> Spanned for Expr<'a> {
 				.name
 				.span()
 				.through(inner.arguments.brace_close.span()),
-			Expr::TypeCtor(inner) => inner.ty.span.through(inner.arguments.brace_close.span()),
+			Expr::TypeCtor(inner) => inner.ty.span().through(inner.arguments.brace_close.span()),
 			Expr::Group(inner) => inner.brace_open.span().through(inner.brace_close.span()),
 			Expr::Bitcast(inner) => inner.keyword.span().through(inner.expr.brace_close.span()),
 			Expr::Literal(inner) => inner.span(),
@@ -166,6 +166,12 @@ impl<'a> Spanned for PostfixExpr<'a> {
 			Some(ref postfix) => self.expr.span().through(postfix.span()),
 			None => self.expr.span(),
 		}
+	}
+}
+
+impl<'a> Spanned for IdentExpr<'a> {
+	fn span(&self) -> Span {
+		todo!()
 	}
 }
 

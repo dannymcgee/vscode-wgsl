@@ -3,6 +3,7 @@ mod decl;
 mod expr;
 mod lexer;
 mod stmt;
+mod traversal;
 
 use gramatika::{Parse, ParseStream, ParseStreamer};
 use std::fmt;

@@ -1,6 +1,9 @@
 use gramatika::{Parse, ParseStreamer, Span, Spanned, SpannedError};
 
-use crate::{expr::Expr, ParseStream, Token, TokenKind, *};
+use crate::{
+	expr::{Expr, IdentExpr},
+	ParseStream, Token, TokenKind, *,
+};
 
 #[derive(DebugLisp)]
 pub struct AttributeList<'a> {
@@ -21,12 +24,10 @@ pub struct Attribute<'a> {
 pub struct TypeDecl<'a> {
 	pub annotator: Option<Token<'a>>,
 	pub attributes: Option<AttributeList<'a>>,
-	pub namespace: Option<Token<'a>>,
-	pub name: Token<'a>,
+	pub name: IdentExpr<'a>,
 	pub child_ty: Option<Token<'a>>,
 	pub storage_class: Option<Token<'a>>,
 	pub access_mode: Option<Token<'a>>,
-	pub span: Span,
 }
 
 #[derive(DebugLisp)]
@@ -116,8 +117,7 @@ impl<'a> Parse<'a> for Attribute<'a> {
 struct TypeDeclBuilder<'a> {
 	attributes: Option<AttributeList<'a>>,
 	annotator: Option<Token<'a>>,
-	namespace: Option<Token<'a>>,
-	name: Option<Token<'a>>,
+	name: Option<IdentExpr<'a>>,
 	child_ty: Option<Token<'a>>,
 	storage_class: Option<Token<'a>>,
 	access_mode: Option<Token<'a>>,
@@ -135,11 +135,7 @@ impl<'a> TypeDeclBuilder<'a> {
 		self.annotator = Some(colon);
 		self
 	}
-	fn namespace(&mut self, namespace: Option<Token<'a>>) -> &mut Self {
-		self.namespace = namespace;
-		self
-	}
-	fn name(&mut self, name: Token<'a>) -> &mut Self {
+	fn name(&mut self, name: IdentExpr<'a>) -> &mut Self {
 		self.name = Some(name);
 		self
 	}
@@ -156,32 +152,33 @@ impl<'a> TypeDeclBuilder<'a> {
 		self
 	}
 	fn build(self) -> TypeDecl<'a> {
-		let first = self
-			.annotator
-			.or_else(|| self.attributes.as_ref().map(|attr| attr.open_brace))
-			.or(self.namespace)
-			.or(self.name)
-			.expect("`name` field is required!");
-
-		let last = self
-			.access_mode
-			.or(self.storage_class)
-			.or(self.child_ty)
-			.or(self.name)
-			.unwrap();
-
-		let span = first.span().through(last.span());
-
 		TypeDecl {
 			annotator: self.annotator,
 			attributes: self.attributes,
-			namespace: self.namespace,
-			name: self.name.unwrap(),
+			name: self.name.expect("`name` field is required!"),
 			child_ty: self.child_ty,
 			storage_class: self.storage_class,
 			access_mode: self.access_mode,
-			span,
 		}
+	}
+}
+
+impl<'a> Spanned for TypeDecl<'a> {
+	fn span(&self) -> Span {
+		let first = self
+			.annotator
+			.map(|token| token.span())
+			.or_else(|| self.attributes.as_ref().map(|attr| attr.span))
+			.unwrap_or_else(|| self.name.span());
+
+		let last = self
+			.access_mode
+			.map(|token| token.span())
+			.or_else(|| self.storage_class.map(|token| token.span()))
+			.or_else(|| self.child_ty.map(|token| token.span()))
+			.unwrap_or_else(|| self.name.span());
+
+		first.through(last)
 	}
 }
 
@@ -199,7 +196,11 @@ impl<'a> Parse<'a> for TypeDecl<'a> {
 			builder.attributes(input.parse()?);
 		}
 		if input.check_kind(TokenKind::Type) {
-			builder.name(input.consume_kind(TokenKind::Type)?);
+			builder.name(IdentExpr {
+				namespace: None,
+				name: input.next().unwrap(),
+			});
+
 			if input.check(operator![<]) {
 				input.consume(operator![<])?;
 
@@ -236,18 +237,7 @@ impl<'a> Parse<'a> for TypeDecl<'a> {
 				}
 			}
 		} else {
-			let mut name = input.consume_kind(TokenKind::Ident)?;
-			let namespace = if input.check(punct![::]) {
-				input.consume(punct![::])?;
-				let namespace = name;
-				name = input.consume_kind(TokenKind::Ident)?;
-
-				Some(namespace)
-			} else {
-				None
-			};
-
-			builder.namespace(namespace).name(name);
+			builder.name(input.parse()?);
 		}
 
 		Ok(builder.build())
