@@ -155,7 +155,10 @@ impl<'a> Parse<'a> for BlockStmt<'a> {
 
 		let mut stmts = vec![];
 		while !input.check(brace!["}"]) {
-			stmts.push(input.parse::<Stmt>()?);
+			match input.peek() {
+				Some(Token::Comment(_, _)) => input.discard(),
+				_ => stmts.push(input.parse::<Stmt>()?),
+			}
 		}
 
 		let brace_close = input.consume(brace!["}"])?;
@@ -200,9 +203,7 @@ impl<'a> Parse<'a> for IfStmt<'a> {
 
 	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
 		let keyword = input.consume_kind(TokenKind::Keyword)?;
-		input.consume(brace!["("])?;
 		let condition = input.parse::<Expr>()?;
-		input.consume(brace![")"])?;
 		let then_branch = input.parse::<BlockStmt>()?;
 
 		let elseif_branch = if input.check(keyword![elseif]) {
@@ -265,11 +266,10 @@ impl<'a> Parse<'a> for SwitchBody<'a> {
 		let mut cases = vec![];
 		let mut default = None;
 
-		loop {
+		while !input.check(brace!["}"]) {
 			match input.peek() {
 				Some(Keyword("case", _)) => cases.push(input.parse::<CaseStmt>()?),
 				Some(Keyword("default", _)) => default = Some(input.parse::<DefaultStmt>()?),
-				Some(Brace("}", _)) => break,
 				Some(other) => {
 					return Err(SpannedError {
 						message: "Expected `case` or `default`".into(),

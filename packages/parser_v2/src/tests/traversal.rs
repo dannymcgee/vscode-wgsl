@@ -10,19 +10,19 @@ use crate::{
 };
 
 #[derive(Default)]
-struct UnusedVarsVisitor {
-	counts: HashMap<String, usize>,
+struct UnusedVarsVisitor<'a> {
+	counts: HashMap<&'a str, usize>,
 }
 
-impl UnusedVarsVisitor {
+impl<'a> UnusedVarsVisitor<'a> {
 	fn new() -> Self {
 		Self::default()
 	}
 }
 
-impl<'a> Visitor<'a> for UnusedVarsVisitor {
-	fn visit_var_decl(&mut self, decl: &VarDecl<'a>) -> FlowControl {
-		self.counts.insert(decl.name.lexeme().into(), 0);
+impl<'a> Visitor<'a> for UnusedVarsVisitor<'a> {
+	fn visit_var_decl(&mut self, decl: &'a VarDecl<'a>) -> FlowControl {
+		self.counts.insert(decl.name.lexeme(), 0);
 
 		if let Some(ref expr) = decl.assignment {
 			expr.walk(self);
@@ -31,7 +31,7 @@ impl<'a> Visitor<'a> for UnusedVarsVisitor {
 		FlowControl::Break
 	}
 
-	fn visit_ident_expr(&mut self, expr: &IdentExpr<'a>) {
+	fn visit_ident_expr(&mut self, expr: &'a IdentExpr<'a>) {
 		if let Some(count) = self.counts.get_mut(expr.name.lexeme()) {
 			*count += 1;
 		}

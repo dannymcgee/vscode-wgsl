@@ -191,7 +191,7 @@ impl<'a> Parse<'a> for VarDecl<'a> {
 		let semicolon = input.consume(punct![;])?;
 
 		Ok(Self {
-			attributes: None, // TOOD
+			attributes: None,
 			storage,
 			storage_qualifiers,
 			name,
@@ -280,13 +280,10 @@ impl<'a> Parse<'a> for StructBody<'a> {
 		let open_brace = input.consume(brace!["{"])?;
 
 		let mut fields = vec![];
-		loop {
+		while !input.check(brace!["}"]) {
 			match input.peek() {
 				Some(Brace("[[", _)) | Some(Ident(_, _)) => {
 					fields.push(input.parse()?);
-				}
-				Some(Brace("}", _)) => {
-					break;
 				}
 				Some(other) => {
 					return Err(SpannedError {
@@ -376,16 +373,12 @@ impl<'a> Parse<'a> for FunctionDecl<'a> {
 		input.consume(brace!["("])?;
 
 		let mut params = vec![];
-		loop {
+		while !input.check(brace![")"]) {
 			match input.peek() {
 				Some(Brace("[[", _) | Ident(_, _)) => {
 					params.push(input.parse::<ParamDecl>()?);
 				}
-				Some(Punct(",", _)) => {
-					input.next().unwrap();
-					continue;
-				}
-				Some(Brace(")", _)) => break,
+				Some(Punct(",", _)) => input.discard(),
 				Some(other) => {
 					return Err(SpannedError {
 						message: "Expected parameter, `,`, or `)`".into(),

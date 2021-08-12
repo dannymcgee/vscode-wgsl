@@ -46,16 +46,10 @@ impl<'a> Parse<'a> for AttributeList<'a> {
 		let open_brace = input.consume(brace!["[["])?;
 
 		let mut attributes = vec![];
-		loop {
+		while !input.check(brace!["]]"]) {
 			match input.peek() {
-				Some(Ident(_, _)) => {
-					attributes.push(input.parse()?);
-				}
-				Some(Punct(",", _)) => {
-					input.next().unwrap();
-					continue;
-				}
-				Some(Brace("]]", _)) => break,
+				Some(Ident(_, _)) => attributes.push(input.parse()?),
+				Some(Punct(",", _)) => input.discard(),
 				Some(other) => {
 					return Err(SpannedError {
 						message: "Expected attribute, `,`, or `]]`".into(),
@@ -204,7 +198,7 @@ impl<'a> Parse<'a> for TypeDecl<'a> {
 			if input.check(operator![<]) {
 				input.consume(operator![<])?;
 
-				loop {
+				while !input.check(operator![>]) {
 					#[rustfmt::skip]
 					match input.next() {
 						Some(token @ Type(_, _) | token @ Ident(_, _)) => {
@@ -216,8 +210,7 @@ impl<'a> Parse<'a> for TypeDecl<'a> {
 						Some(token @ Keyword("read" | "write" | "read_write", _)) => {
 							builder.access_mode(token);
 						}
-						Some(Punct(",", _)) => continue,
-						Some(Operator(">", _)) => break,
+						Some(Punct(",", _)) => {},
 						Some(other) => {
 							return Err(SpannedError {
 								message: "Expected type, storage class, access mode, or texel format"
@@ -235,6 +228,8 @@ impl<'a> Parse<'a> for TypeDecl<'a> {
 						}
 					};
 				}
+
+				input.consume(operator![>])?;
 			}
 		} else {
 			builder.name(input.parse()?);
@@ -252,16 +247,10 @@ impl<'a> Parse<'a> for ArgumentList<'a> {
 
 		let brace_open = input.consume(brace!["("])?;
 		let mut arguments = vec![];
-		loop {
+		while !input.check(brace![")"]) {
 			match input.peek() {
-				Some(Punct(",", _)) => {
-					input.next().unwrap();
-					continue;
-				}
-				Some(Brace(")", _)) => break,
-				Some(_) => {
-					arguments.push(input.parse::<Expr>()?);
-				}
+				Some(Punct(",", _)) => input.discard(),
+				Some(_) => arguments.push(input.parse::<Expr>()?),
 				None => {
 					return Err(SpannedError {
 						message: "Unexpected end of input".into(),

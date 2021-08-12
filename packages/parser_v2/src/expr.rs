@@ -213,6 +213,10 @@ impl<'a> Parse<'a> for PrimaryExpr<'a> {
 					Ok(Expr::Ident(ident))
 				}
 			}
+			Some(Comment(_, _)) => {
+				input.discard();
+				input.parse::<Expr>()
+			}
 			Some(other) => Err(SpannedError {
 				message: "Expected expression".into(),
 				span: Some(other.span()),
