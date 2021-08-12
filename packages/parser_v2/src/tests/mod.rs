@@ -1,5 +1,6 @@
 mod common;
 mod decl;
+mod e2e;
 mod expr;
 mod lexer;
 mod stmt;

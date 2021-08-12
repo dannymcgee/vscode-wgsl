@@ -462,6 +462,7 @@ impl<'a> Parse<'a> for ExtensionDecl<'a> {
 	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
 		let keyword = input.consume(keyword![enable])?;
 		let name = input.consume_kind(TokenKind::Ident)?;
+		input.consume(punct![;])?;
 
 		Ok(Self { keyword, name })
 	}
@@ -475,6 +476,7 @@ impl<'a> Parse<'a> for ModuleDecl<'a> {
 		let name = input.consume_kind(TokenKind::Ident)?;
 		let from_kw = input.consume(keyword![from])?;
 		let path = input.consume_kind(TokenKind::Path)?;
+		input.consume(punct![;])?;
 
 		Ok(Self {
 			import_kw,
