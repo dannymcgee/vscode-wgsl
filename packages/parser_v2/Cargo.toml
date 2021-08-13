@@ -8,7 +8,16 @@ gramatika = "*"
 
 [dev-dependencies]
 criterion = "0.3"
+parser = { path = "../parser" }
 
 [[bench]]
 name = "lexer"
+harness = false
+
+[[bench]]
+name = "parsing"
+harness = false
+
+[[bench]]
+name = "traversal"
 harness = false
