@@ -118,6 +118,25 @@
 				}
 			}
 		},
+		"utils": {
+			"root": "packages/utils",
+			"projectType": "library",
+			"sourceRoot": "packages/utils/src",
+			"targets": {
+				"test": {
+					"executor": "@nxrs/cargo:test",
+					"options": {}
+				},
+				"lint": {
+					"executor": "@nxrs/cargo:clippy",
+					"options": {
+						"fix": false,
+						"failOnWarnings": true,
+						"noDeps": true
+					}
+				}
+			}
+		},
 		"wgsl_plus": {
 			"root": "packages/wgsl-plus",
 			"projectType": "library",

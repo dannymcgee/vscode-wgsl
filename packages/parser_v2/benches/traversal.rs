@@ -2,23 +2,15 @@ use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criteri
 use gramatika::{ParseStream, ParseStreamer};
 use parser_v2::{
 	common::{AttributeList, TypeDecl},
-	decl::{
-		Decl, ExtensionDecl, FieldDecl, FunctionDecl, ModuleDecl, ParamDecl, StructDecl,
-		TypeAliasDecl, VarDecl,
-	},
-	expr::{
-		BinaryExpr, BitcastExpr, Expr, FnCallExpr, GroupExpr, IdentExpr, PostfixExpr, PrimaryExpr,
-		TypeCtorExpr, UnaryExpr,
-	},
-	stmt::{
-		CaseStmt, ContinuingStmt, ElseStmt, ExprStmt, ForStmt, IfStmt, LoopStmt, ReturnStmt, Stmt,
-		SwitchStmt,
-	},
+	decl::*,
+	expr::*,
+	stmt::*,
 	traversal::{FlowControl, Visitor, Walk},
 	SyntaxTree, Token,
 };
+use utils::hashmap;
 
-const PROGRAM: &str = include_str!("shader.wgsl");
+use FlowControl::*;
 
 criterion_group!(benches, traversal);
 criterion_main!(benches);
@@ -34,7 +26,40 @@ impl NodeCountVisitor {
 	}
 }
 
-use FlowControl::*;
+pub fn traversal(c: &mut Criterion) {
+	let mut group = c.benchmark_group("Visitor");
+	group.confidence_level(0.99);
+
+	let programs = hashmap![
+		"shader.wgsl" => include_str!("../test-files/shader.wgsl"),
+		"boids.wgsl" => include_str!("../test-files/boids.wgsl"),
+		"shadow.wgsl" => include_str!("../test-files/shadow.wgsl"),
+		"water.wgsl" => include_str!("../test-files/water.wgsl"),
+	];
+
+	for (key, program) in programs {
+		let name = BenchmarkId::new("Traversal", key);
+
+		let setup = || {
+			let tree = match ParseStream::from(program).parse::<SyntaxTree>() {
+				Ok(tree) => tree,
+				Err(_) => panic!(),
+			};
+			let visitor = NodeCountVisitor::new();
+
+			(tree, visitor)
+		};
+
+		let routine = |(tree, visitor): &mut (SyntaxTree, NodeCountVisitor)| {
+			tree.walk(visitor);
+			visitor.count
+		};
+
+		group.bench_function(name, move |b| {
+			b.iter_batched_ref(setup, routine, BatchSize::SmallInput)
+		});
+	}
+}
 
 impl<'a> Visitor<'a> for NodeCountVisitor {
 	fn visit_decl(&mut self, decl: &'a Decl<'a>) -> FlowControl {
@@ -264,30 +289,4 @@ impl<'a> Visitor<'a> for NodeCountVisitor {
 		criterion::black_box(expr);
 		self.count += 1;
 	}
-}
-
-pub fn traversal(c: &mut Criterion) {
-	let mut group = c.benchmark_group("Visitor");
-	group.confidence_level(0.99);
-
-	let name = BenchmarkId::new("Traversal", "shader.wgsl");
-
-	let setup = || {
-		let tree = match ParseStream::from(PROGRAM).parse::<SyntaxTree>() {
-			Ok(tree) => tree,
-			Err(_) => panic!(),
-		};
-		let visitor = NodeCountVisitor::new();
-
-		(tree, visitor)
-	};
-
-	let routine = |(tree, visitor): &mut (SyntaxTree, NodeCountVisitor)| {
-		tree.walk(visitor);
-		visitor.count
-	};
-
-	group.bench_function(name, move |b| {
-		b.iter_batched_ref(setup, routine, BatchSize::SmallInput)
-	});
 }

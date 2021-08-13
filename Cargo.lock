@@ -418,9 +418,7 @@ dependencies = [
 
 [[package]]
 name = "gramatika"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ace863093d31f3602a083ca147f41f88c6fa971c2f33f581807b0e45a10eeb4b"
+version = "0.2.0"
 dependencies = [
  "gramatika-macro",
  "lazy_static",
@@ -429,9 +427,7 @@ dependencies = [
 
 [[package]]
 name = "gramatika-macro"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a0e57897f6b647966e547524773b96e0061f78cad51d0545b08e17e5c95140d8"
+version = "0.2.0"
 dependencies = [
  "convert_case",
  "itertools",
@@ -633,6 +629,8 @@ version = "0.1.0"
 dependencies = [
  "criterion",
  "gramatika",
+ "parser",
+ "utils",
 ]
 
 [[package]]
@@ -1094,6 +1092,10 @@ dependencies = [
  "percent-encoding",
  "serde",
 ]
+
+[[package]]
+name = "utils"
+version = "0.1.0"
 
 [[package]]
 name = "walkdir"

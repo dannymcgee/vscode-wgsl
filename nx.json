@@ -43,6 +43,9 @@
 		"server": {
 			"tags": []
 		},
+		"utils": {
+			"tags": []
+		},
 		"wgsl_plus": {
 			"tags": []
 		}

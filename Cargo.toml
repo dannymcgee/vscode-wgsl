@@ -3,5 +3,6 @@ members = [
 	"packages/parser",
 	"packages/parser_v2",
 	"packages/server",
+	"packages/utils",
 	"packages/wgsl-plus",
 ]

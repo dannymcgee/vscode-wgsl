@@ -62,7 +62,7 @@ VEC         = @{ "vec" ~ '2'..'4' }
 
 MULTISAMPLED_TEXTURE_TYPE = @{ "texture_multisampled_2d" }
 EXTERN_TEXTURE_TYPE       = @{ "texture_external" }
-DEPTH_TEXTURE_TYPE        = @{ "texture_depth_" ~ "2d"|"cube" ~ "_array"? }
+DEPTH_TEXTURE_TYPE        = @{ "texture_depth_" ~ "2d_array"|"2d"|"cube" }
 SAMPLER_TYPE              = @{ "sampler" ~ "_comparison"? }
 
 SAMPLED_TEXTURE_TYPE = @{

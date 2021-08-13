@@ -101,7 +101,8 @@ pub(crate) trait TranscludeModule<'a> {
 }
 
 impl<'a> TranscludeModule<'a> for HashMap<String, Arc<Decl>> {
-	type Output = impl IntoIterator<Item = Decl>;
+	// type Output = impl IntoIterator<Item = Decl>;
+	type Output = Vec<Decl>;
 
 	fn transclude(&'a self, module_name: &'a str) -> Self::Output {
 		use Decl::*;
@@ -112,6 +113,7 @@ impl<'a> TranscludeModule<'a> for HashMap<String, Arc<Decl>> {
 				Function(decl) => Some(decl.transclude(module_name)),
 				_ => None,
 			})
+			.collect()
 	}
 }
 
