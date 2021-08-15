@@ -4,14 +4,16 @@ extern crate gramatika;
 pub mod common;
 pub mod decl;
 pub mod expr;
+pub mod scopes;
 pub mod stmt;
 pub mod token;
 pub mod traversal;
+pub mod utils;
 
-type ParseStream<'a> = gramatika::ParseStream<'a, Token<'a>, Lexer<'a>>;
+pub type ParseStream<'a> = gramatika::ParseStream<'a, Token<'a>, Lexer<'a>>;
 
 use decl::Decl;
-use gramatika::{Parse, ParseStreamer};
+pub use gramatika::{Parse, ParseStreamer, Result, Span, Spanned};
 pub use token::{Lexer, Token, TokenKind, *};
 
 #[derive(DebugLisp)]
@@ -32,6 +34,16 @@ impl<'a> Parse<'a> for SyntaxTree<'a> {
 		}
 
 		Ok(Self { inner })
+	}
+}
+
+impl<'a> Spanned for SyntaxTree<'a> {
+	fn span(&self) -> Span {
+		self.inner
+			.first()
+			.unwrap()
+			.span()
+			.through(self.inner.last().unwrap().span())
 	}
 }
 

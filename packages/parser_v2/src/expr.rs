@@ -7,7 +7,7 @@ use crate::{
 	ParseStream, Token, *,
 };
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub enum Expr<'a> {
 	Unary(UnaryExpr<'a>),
 	Binary(BinaryExpr<'a>),
@@ -21,64 +21,65 @@ pub enum Expr<'a> {
 	Primary(PrimaryExpr<'a>),
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct UnaryExpr<'a> {
 	pub op: Token<'a>,
 	pub expr: Box<Expr<'a>>,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct BinaryExpr<'a> {
 	pub lhs: Box<Expr<'a>>,
 	pub op: Token<'a>,
 	pub rhs: Box<Expr<'a>>,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct FnCallExpr<'a> {
 	pub ident: IdentExpr<'a>,
 	pub arguments: ArgumentList<'a>,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct TypeCtorExpr<'a> {
 	pub ty: TypeDecl<'a>,
 	pub arguments: ArgumentList<'a>,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct GroupExpr<'a> {
 	pub brace_open: Token<'a>,
 	pub expr: Box<Expr<'a>>,
 	pub brace_close: Token<'a>,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct BitcastExpr<'a> {
 	pub keyword: Token<'a>,
 	pub ty: TypeDecl<'a>,
 	pub expr: GroupExpr<'a>,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct IdentExpr<'a> {
 	pub namespace: Option<Token<'a>>,
 	pub name: Token<'a>,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct PrimaryExpr<'a> {
 	pub expr: Box<Expr<'a>>,
 	pub postfix: Option<PostfixExpr<'a>>,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct PostfixExpr<'a> {
 	pub accessor: Accessor<'a>,
 	pub expr: Box<Expr<'a>>,
 	pub postfix: Option<Box<PostfixExpr<'a>>>,
 }
 
+#[derive(Clone)]
 pub enum Accessor<'a> {
 	Dot(Token<'a>),
 	Index([Token<'a>; 2]),
@@ -171,7 +172,10 @@ impl<'a> Spanned for PostfixExpr<'a> {
 
 impl<'a> Spanned for IdentExpr<'a> {
 	fn span(&self) -> Span {
-		todo!()
+		match self.namespace {
+			Some(ref token) => token.span().through(self.name.span()),
+			None => self.name.span(),
+		}
 	}
 }
 
@@ -325,7 +329,7 @@ impl<'a> Parse<'a> for PostfixExpr<'a> {
 		if input.check(punct![.]) {
 			let dot = input.next().unwrap();
 			let accessor = Accessor::Dot(dot);
-			let expr = input.parse::<Expr>()?;
+			let expr = Expr::Primary(input.parse()?);
 
 			let postfix = match input.peek() {
 				Some(Punct(".", _) | Brace("[", _)) => {

@@ -5,7 +5,7 @@ use gramatika::{Parse, ParseStreamer, Spanned, SpannedError};
 use crate::{decl::VarDecl, expr::Expr, ParseStream, Token, *};
 
 #[allow(clippy::large_enum_variant)] // TODO
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub enum Stmt<'a> {
 	Block(BlockStmt<'a>),
 	Return(ReturnStmt<'a>),
@@ -23,21 +23,21 @@ pub enum Stmt<'a> {
 	Empty(Token<'a>),
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct BlockStmt<'a> {
 	pub brace_open: Token<'a>,
 	pub stmts: Vec<Stmt<'a>>,
 	pub brace_close: Token<'a>,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct ReturnStmt<'a> {
 	pub keyword: Token<'a>,
 	pub value: Option<Expr<'a>>,
 	pub semicolon: Token<'a>,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct IfStmt<'a> {
 	pub keyword: Token<'a>,
 	pub condition: Expr<'a>,
@@ -46,20 +46,20 @@ pub struct IfStmt<'a> {
 	pub else_branch: Option<ElseStmt<'a>>,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct ElseStmt<'a> {
 	pub keyword: Token<'a>,
 	pub body: BlockStmt<'a>,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct SwitchStmt<'a> {
 	pub keyword: Token<'a>,
 	pub subject: Expr<'a>,
 	pub body: SwitchBody<'a>,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct SwitchBody<'a> {
 	pub brace_open: Token<'a>,
 	pub cases: Vec<CaseStmt<'a>>,
@@ -67,7 +67,7 @@ pub struct SwitchBody<'a> {
 	pub brace_close: Token<'a>,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct CaseStmt<'a> {
 	pub keyword: Token<'a>,
 	pub selectors: Vec<Token<'a>>,
@@ -75,26 +75,26 @@ pub struct CaseStmt<'a> {
 	pub body: BlockStmt<'a>,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct DefaultStmt<'a> {
 	pub keyword: Token<'a>,
 	pub colon: Token<'a>,
 	pub body: BlockStmt<'a>,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct LoopStmt<'a> {
 	pub keyword: Token<'a>,
 	pub body: BlockStmt<'a>,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct ContinuingStmt<'a> {
 	pub keyword: Token<'a>,
 	pub body: BlockStmt<'a>,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct ForStmt<'a> {
 	pub keyword: Token<'a>,
 	pub initializer: Option<Box<Stmt<'a>>>,
@@ -103,13 +103,13 @@ pub struct ForStmt<'a> {
 	pub body: BlockStmt<'a>,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct KeywordStmt<'a> {
 	pub keyword: Token<'a>,
 	pub semicolon: Token<'a>,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct ExprStmt<'a> {
 	pub expr: Expr<'a>,
 	pub semicolon: Token<'a>,
@@ -147,6 +147,29 @@ impl<'a> Parse<'a> for Stmt<'a> {
 	}
 }
 
+impl<'a> Spanned for Stmt<'a> {
+	fn span(&self) -> Span {
+		use Stmt::*;
+
+		match self {
+			Block(inner) => inner.span(),
+			Return(inner) => inner.span(),
+			If(inner) => inner.span(),
+			Switch(inner) => inner.span(),
+			Loop(inner) => inner.span(),
+			Continuing(inner) => inner.span(),
+			For(inner) => inner.span(),
+			Var(inner) => inner.span(),
+			Break(inner) => inner.span(),
+			Continue(inner) => inner.span(),
+			Discard(inner) => inner.span(),
+			Fallthrough(inner) => inner.span(),
+			Expr(inner) => inner.span(),
+			Empty(inner) => inner.span(),
+		}
+	}
+}
+
 impl<'a> Parse<'a> for BlockStmt<'a> {
 	type Stream = ParseStream<'a>;
 
@@ -168,6 +191,12 @@ impl<'a> Parse<'a> for BlockStmt<'a> {
 			stmts,
 			brace_close,
 		})
+	}
+}
+
+impl<'a> Spanned for BlockStmt<'a> {
+	fn span(&self) -> Span {
+		self.brace_open.span().through(self.brace_close.span())
 	}
 }
 
@@ -195,6 +224,12 @@ impl<'a> Parse<'a> for ReturnStmt<'a> {
 				semicolon,
 			})
 		}
+	}
+}
+
+impl<'a> Spanned for ReturnStmt<'a> {
+	fn span(&self) -> Span {
+		self.keyword.span().through(self.semicolon.span())
 	}
 }
 
@@ -228,6 +263,19 @@ impl<'a> Parse<'a> for IfStmt<'a> {
 	}
 }
 
+impl<'a> Spanned for IfStmt<'a> {
+	fn span(&self) -> Span {
+		let end_span = self
+			.else_branch
+			.as_ref()
+			.map(|stmt| stmt.span())
+			.or_else(|| self.elseif_branch.as_ref().map(|stmt| stmt.span()))
+			.unwrap_or_else(|| self.then_branch.span());
+
+		self.keyword.span().through(end_span)
+	}
+}
+
 impl<'a> Parse<'a> for ElseStmt<'a> {
 	type Stream = ParseStream<'a>;
 
@@ -236,6 +284,12 @@ impl<'a> Parse<'a> for ElseStmt<'a> {
 		let body = input.parse::<BlockStmt>()?;
 
 		Ok(Self { keyword, body })
+	}
+}
+
+impl<'a> Spanned for ElseStmt<'a> {
+	fn span(&self) -> Span {
+		self.keyword.span().through(self.body.span())
 	}
 }
 
@@ -252,6 +306,12 @@ impl<'a> Parse<'a> for SwitchStmt<'a> {
 			subject,
 			body,
 		})
+	}
+}
+
+impl<'a> Spanned for SwitchStmt<'a> {
+	fn span(&self) -> Span {
+		self.keyword.span().through(self.body.span())
 	}
 }
 
@@ -295,6 +355,12 @@ impl<'a> Parse<'a> for SwitchBody<'a> {
 			default,
 			brace_close,
 		})
+	}
+}
+
+impl<'a> Spanned for SwitchBody<'a> {
+	fn span(&self) -> Span {
+		self.brace_open.span().through(self.brace_close.span())
 	}
 }
 
@@ -346,6 +412,12 @@ impl<'a> Parse<'a> for CaseStmt<'a> {
 	}
 }
 
+impl<'a> Spanned for CaseStmt<'a> {
+	fn span(&self) -> Span {
+		self.keyword.span().through(self.body.span())
+	}
+}
+
 impl<'a> Parse<'a> for DefaultStmt<'a> {
 	type Stream = ParseStream<'a>;
 
@@ -362,6 +434,12 @@ impl<'a> Parse<'a> for DefaultStmt<'a> {
 	}
 }
 
+impl<'a> Spanned for DefaultStmt<'a> {
+	fn span(&self) -> Span {
+		self.keyword.span().through(self.body.span())
+	}
+}
+
 impl<'a> Parse<'a> for LoopStmt<'a> {
 	type Stream = ParseStream<'a>;
 
@@ -373,6 +451,12 @@ impl<'a> Parse<'a> for LoopStmt<'a> {
 	}
 }
 
+impl<'a> Spanned for LoopStmt<'a> {
+	fn span(&self) -> Span {
+		self.keyword.span().through(self.body.span())
+	}
+}
+
 impl<'a> Parse<'a> for ContinuingStmt<'a> {
 	type Stream = ParseStream<'a>;
 
@@ -381,6 +465,12 @@ impl<'a> Parse<'a> for ContinuingStmt<'a> {
 		let body = input.parse::<BlockStmt>()?;
 
 		Ok(Self { keyword, body })
+	}
+}
+
+impl<'a> Spanned for ContinuingStmt<'a> {
+	fn span(&self) -> Span {
+		self.keyword.span().through(self.body.span())
 	}
 }
 
@@ -440,6 +530,12 @@ impl<'a> Parse<'a> for ForStmt<'a> {
 	}
 }
 
+impl<'a> Spanned for ForStmt<'a> {
+	fn span(&self) -> Span {
+		self.keyword.span().through(self.body.span())
+	}
+}
+
 impl<'a> Parse<'a> for KeywordStmt<'a> {
 	type Stream = ParseStream<'a>;
 
@@ -451,6 +547,12 @@ impl<'a> Parse<'a> for KeywordStmt<'a> {
 	}
 }
 
+impl<'a> Spanned for KeywordStmt<'a> {
+	fn span(&self) -> Span {
+		self.keyword.span().through(self.semicolon.span())
+	}
+}
+
 impl<'a> Parse<'a> for ExprStmt<'a> {
 	type Stream = ParseStream<'a>;
 
@@ -459,5 +561,11 @@ impl<'a> Parse<'a> for ExprStmt<'a> {
 		let semicolon = input.consume(punct![;])?;
 
 		Ok(Self { expr, semicolon })
+	}
+}
+
+impl<'a> Spanned for ExprStmt<'a> {
+	fn span(&self) -> Span {
+		self.expr.span().through(self.semicolon.span())
 	}
 }

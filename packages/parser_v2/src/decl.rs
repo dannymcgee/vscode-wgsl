@@ -7,7 +7,7 @@ use crate::{
 	ParseStream, Token, TokenKind, *,
 };
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub enum Decl<'a> {
 	Var(VarDecl<'a>),
 	Const(VarDecl<'a>),
@@ -20,7 +20,7 @@ pub enum Decl<'a> {
 	Module(ModuleDecl<'a>),
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct VarDecl<'a> {
 	pub attributes: Option<AttributeList<'a>>,
 	pub storage: Token<'a>,
@@ -31,7 +31,7 @@ pub struct VarDecl<'a> {
 	pub semicolon: Token<'a>,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct TypeAliasDecl<'a> {
 	pub storage: Token<'a>,
 	pub name: Token<'a>,
@@ -40,7 +40,7 @@ pub struct TypeAliasDecl<'a> {
 	pub semicolon: Token<'a>,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct StructDecl<'a> {
 	pub attributes: Option<AttributeList<'a>>,
 	pub storage: Token<'a>,
@@ -50,14 +50,14 @@ pub struct StructDecl<'a> {
 	pub semicolon: Token<'a>,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct StructBody<'a> {
 	pub open_brace: Token<'a>,
-	pub fields: Vec<FieldDecl<'a>>,
+	pub fields: Vec<Decl<'a>>,
 	pub close_brace: Token<'a>,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct FieldDecl<'a> {
 	pub attributes: Option<AttributeList<'a>>,
 	pub name: Token<'a>,
@@ -65,36 +65,37 @@ pub struct FieldDecl<'a> {
 	pub semicolon: Token<'a>,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct FunctionDecl<'a> {
 	pub attributes: Option<AttributeList<'a>>,
 	pub storage: Token<'a>,
 	pub storage_modifier: Option<Token<'a>>,
 	pub name: Token<'a>,
-	pub params: Vec<ParamDecl<'a>>,
+	pub params: Vec<Decl<'a>>,
 	pub return_ty: Option<TypeDecl<'a>>,
 	pub body: BlockStmt<'a>,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct ParamDecl<'a> {
 	pub attributes: Option<AttributeList<'a>>,
 	pub name: Token<'a>,
 	pub ty: TypeDecl<'a>,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct ExtensionDecl<'a> {
 	pub keyword: Token<'a>,
 	pub name: Token<'a>,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct ModuleDecl<'a> {
 	pub import_kw: Token<'a>,
 	pub name: Token<'a>,
 	pub from_kw: Token<'a>,
 	pub path: Token<'a>,
+	pub semicolon: Token<'a>,
 }
 
 impl<'a> Parse<'a> for Decl<'a> {
@@ -149,6 +150,24 @@ impl<'a> Parse<'a> for Decl<'a> {
 				source: input.source(),
 				span: None,
 			}),
+		}
+	}
+}
+
+impl<'a> Spanned for Decl<'a> {
+	fn span(&self) -> Span {
+		use Decl::*;
+
+		match self {
+			Var(inner) => inner.span(),
+			Const(inner) => inner.span(),
+			TypeAlias(inner) => inner.span(),
+			Struct(inner) => inner.span(),
+			Field(inner) => inner.span(),
+			Function(inner) => inner.span(),
+			Param(inner) => inner.span(),
+			Extension(inner) => inner.span(),
+			Module(inner) => inner.span(),
 		}
 	}
 }
@@ -283,7 +302,8 @@ impl<'a> Parse<'a> for StructBody<'a> {
 		while !input.check(brace!["}"]) {
 			match input.peek() {
 				Some(Brace("[[", _)) | Some(Ident(_, _)) => {
-					fields.push(input.parse()?);
+					let field = input.parse::<FieldDecl>()?;
+					fields.push(Decl::Field(field));
 				}
 				Some(other) => {
 					return Err(SpannedError {
@@ -376,7 +396,8 @@ impl<'a> Parse<'a> for FunctionDecl<'a> {
 		while !input.check(brace![")"]) {
 			match input.peek() {
 				Some(Brace("[[", _) | Ident(_, _)) => {
-					params.push(input.parse::<ParamDecl>()?);
+					let param = input.parse::<ParamDecl>()?;
+					params.push(Decl::Param(param));
 				}
 				Some(Punct(",", _)) => input.discard(),
 				Some(other) => {
@@ -468,6 +489,12 @@ impl<'a> Parse<'a> for ExtensionDecl<'a> {
 	}
 }
 
+impl<'a> Spanned for ExtensionDecl<'a> {
+	fn span(&self) -> Span {
+		self.keyword.span().through(self.name.span())
+	}
+}
+
 impl<'a> Parse<'a> for ModuleDecl<'a> {
 	type Stream = ParseStream<'a>;
 
@@ -476,13 +503,20 @@ impl<'a> Parse<'a> for ModuleDecl<'a> {
 		let name = input.consume_kind(TokenKind::Ident)?;
 		let from_kw = input.consume(keyword![from])?;
 		let path = input.consume_kind(TokenKind::Path)?;
-		input.consume(punct![;])?;
+		let semicolon = input.consume(punct![;])?;
 
 		Ok(Self {
 			import_kw,
 			name,
 			from_kw,
 			path,
+			semicolon,
 		})
+	}
+}
+
+impl<'a> Spanned for ModuleDecl<'a> {
+	fn span(&self) -> Span {
+		self.import_kw.span().through(self.semicolon.span())
 	}
 }

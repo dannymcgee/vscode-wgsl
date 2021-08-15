@@ -5,7 +5,7 @@ use crate::{
 	ParseStream, Token, TokenKind, *,
 };
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct AttributeList<'a> {
 	pub open_brace: Token<'a>,
 	pub attributes: Vec<Attribute<'a>>,
@@ -13,14 +13,14 @@ pub struct AttributeList<'a> {
 	pub span: Span,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct Attribute<'a> {
 	pub name: Token<'a>,
 	pub value: Option<Token<'a>>,
 	pub span: Span,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct TypeDecl<'a> {
 	pub annotator: Option<Token<'a>>,
 	pub attributes: Option<AttributeList<'a>>,
@@ -30,7 +30,7 @@ pub struct TypeDecl<'a> {
 	pub access_mode: Option<Token<'a>>,
 }
 
-#[derive(DebugLisp)]
+#[derive(Clone, DebugLisp)]
 pub struct ArgumentList<'a> {
 	pub brace_open: Token<'a>,
 	pub arguments: Vec<Expr<'a>>,

@@ -5,11 +5,17 @@ edition = "2018"
 
 [dependencies]
 gramatika = { path = "../../../../gramatika/crates/gramatika" }
+lsp-types = "0.89"
+parking_lot = "0.11"
 
 [dev-dependencies]
-criterion = "0.3"
 parser = { path = "../parser" }
+similar = "1.3"
 utils = { path = "../utils" }
+
+[dev-dependencies.criterion]
+version = "0.3"
+features = ["cargo_bench_support", "html_reports"]
 
 [[bench]]
 name = "lexer"
@@ -21,4 +27,8 @@ harness = false
 
 [[bench]]
 name = "traversal"
+harness = false
+
+[[bench]]
+name = "scopes"
 harness = false

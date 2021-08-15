@@ -1,4 +1,6 @@
-use crate::expr::Expr;
+use gramatika::ParseStreamer;
+
+use crate::{expr::Expr, tests, ParseStream};
 
 #[test]
 fn unary_expr() {
@@ -65,4 +67,48 @@ fn primary_expr_postfixes() {
 	super::parse::<Expr>("foo.bar.baz");
 	super::parse::<Expr>("foo.bar[baz]");
 	super::parse::<Expr>("foo.bar(4).baz(2)[0]");
+}
+
+// --- Regressions -----------------------------------------------------------------------
+
+/// The postfix expression following `light.` should only encompass `color`,
+/// instead of consuming `color * ambient_strength` as a binary expression
+#[test]
+fn limited_postfix_expr() {
+	// FIXME: Use some sort of snapshot-testing library -- this is not sustainable
+	match ParseStream::from("light.color * ambient_strength").parse::<Expr>() {
+		Ok(expr) => {
+			let parsed = format!("{:#?}", expr);
+			let expected = r#"
+(Expr::Binary (BinaryExpr
+	lhs: (Expr::Primary (PrimaryExpr
+		expr: (Expr::Ident (IdentExpr
+			name: `light` (Ident (0:0...0:5)),
+		)),
+		postfix: (PostfixExpr
+			accessor: (Accessor::Dot `.` (Punct (0:5...0:6))),
+			expr: (Expr::Primary (PrimaryExpr
+				expr: (Expr::Ident (IdentExpr
+					name: `color` (Ident (0:6...0:11)),
+				)),
+			)),
+		),
+	)),
+	op: `*` (Operator (0:12...0:13)),
+	rhs: (Expr::Primary (PrimaryExpr
+		expr: (Expr::Ident (IdentExpr
+			name: `ambient_strength` (Ident (0:14...0:30)),
+		)),
+	)),
+))
+			"#;
+			let expected = expected.trim().replace('\t', "   ");
+
+			assert_eq!(parsed, expected, "{}", tests::diff(&parsed, &expected));
+		}
+		Err(err) => {
+			eprintln!("{}", err);
+			panic!();
+		}
+	}
 }

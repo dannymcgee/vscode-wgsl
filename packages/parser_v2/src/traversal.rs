@@ -11,8 +11,8 @@ use crate::{
 		TypeCtorExpr, UnaryExpr,
 	},
 	stmt::{
-		CaseStmt, ContinuingStmt, ElseStmt, ExprStmt, ForStmt, IfStmt, LoopStmt, ReturnStmt, Stmt,
-		SwitchStmt,
+		BlockStmt, CaseStmt, ContinuingStmt, ElseStmt, ExprStmt, ForStmt, IfStmt, LoopStmt,
+		ReturnStmt, Stmt, SwitchStmt,
 	},
 	SyntaxTree, Token,
 };
@@ -154,9 +154,7 @@ impl<'a> Walk<'a> for FunctionDecl<'a> {
 				ty.walk(visitor);
 			}
 
-			for stmt in self.body.stmts.iter() {
-				stmt.walk(visitor);
-			}
+			self.body.walk(visitor);
 		}
 	}
 }
@@ -189,11 +187,7 @@ impl<'a> Walk<'a> for Stmt<'a> {
 
 		if visitor.visit_stmt(self) == FlowControl::Continue {
 			match self {
-				Block(stmt) => {
-					for stmt in stmt.stmts.iter() {
-						stmt.walk(visitor);
-					}
-				}
+				Block(stmt) => stmt.walk(visitor),
 				Return(stmt) => stmt.walk(visitor),
 				If(stmt) => stmt.walk(visitor),
 				Switch(stmt) => stmt.walk(visitor),
@@ -204,6 +198,14 @@ impl<'a> Walk<'a> for Stmt<'a> {
 				Expr(stmt) => stmt.walk(visitor),
 				_ => {}
 			}
+		}
+	}
+}
+
+impl<'a> Walk<'a> for BlockStmt<'a> {
+	fn walk(&'a self, visitor: &mut dyn Visitor<'a>) {
+		for stmt in self.stmts.iter() {
+			stmt.walk(visitor);
 		}
 	}
 }
@@ -228,10 +230,7 @@ impl<'a> Walk<'a> for IfStmt<'a> {
 
 		if visit_method(visitor, self) == FlowControl::Continue {
 			self.condition.walk(visitor);
-
-			for stmt in self.then_branch.stmts.iter() {
-				stmt.walk(visitor);
-			}
+			self.then_branch.walk(visitor);
 
 			if let Some(ref stmt) = self.elseif_branch {
 				stmt.walk(visitor);
@@ -247,9 +246,7 @@ impl<'a> Walk<'a> for IfStmt<'a> {
 impl<'a> Walk<'a> for ElseStmt<'a> {
 	fn walk(&'a self, visitor: &mut dyn Visitor<'a>) {
 		if visitor.visit_else_stmt(self) == FlowControl::Continue {
-			for stmt in self.body.stmts.iter() {
-				stmt.walk(visitor);
-			}
+			self.body.walk(visitor);
 		}
 	}
 }
@@ -269,9 +266,7 @@ impl<'a> Walk<'a> for SwitchStmt<'a> {
 impl<'a> Walk<'a> for CaseStmt<'a> {
 	fn walk(&'a self, visitor: &mut dyn Visitor<'a>) {
 		if visitor.visit_case_stmt(self) == FlowControl::Continue {
-			for stmt in self.body.stmts.iter() {
-				stmt.walk(visitor);
-			}
+			self.body.walk(visitor);
 		}
 	}
 }
@@ -279,9 +274,7 @@ impl<'a> Walk<'a> for CaseStmt<'a> {
 impl<'a> Walk<'a> for LoopStmt<'a> {
 	fn walk(&'a self, visitor: &mut dyn Visitor<'a>) {
 		if visitor.visit_loop_stmt(self) == FlowControl::Continue {
-			for stmt in self.body.stmts.iter() {
-				stmt.walk(visitor);
-			}
+			self.body.walk(visitor);
 		}
 	}
 }
@@ -289,9 +282,7 @@ impl<'a> Walk<'a> for LoopStmt<'a> {
 impl<'a> Walk<'a> for ContinuingStmt<'a> {
 	fn walk(&'a self, visitor: &mut dyn Visitor<'a>) {
 		if visitor.visit_continuing_stmt(self) == FlowControl::Continue {
-			for stmt in self.body.stmts.iter() {
-				stmt.walk(visitor);
-			}
+			self.body.walk(visitor);
 		}
 	}
 }
@@ -311,9 +302,7 @@ impl<'a> Walk<'a> for ForStmt<'a> {
 				expr.walk(visitor);
 			}
 
-			for stmt in self.body.stmts.iter() {
-				stmt.walk(visitor);
-			}
+			self.body.walk(visitor);
 		}
 	}
 }
