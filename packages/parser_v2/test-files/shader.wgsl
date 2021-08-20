@@ -85,7 +85,8 @@ fn frag(in: VertexOutput) -> [[location(0)]] vec4<f32> {
 	let view_dir = normalize(uniforms.view_pos.xyz - in.world_position);
 	let half_dir = normalize(view_dir + light_dir);
 	let specular_strength = pow(lib::dot_floored(in.world_normal, half_dir), 32.0);
-	let specular_strength = in.world_normal
+	let specular_strength = in
+		.world_normal
 		.dot(half_dir)
 		.max(0.0)
 		.pow(32.0);

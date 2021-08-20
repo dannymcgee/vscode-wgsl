@@ -181,7 +181,11 @@ impl<'a> Visitor<'a> for ScopeBuilder<'a> {
 	}
 
 	fn visit_var_decl(&mut self, decl: &'a VarDecl<'a>) -> FlowControl {
-		simple_decl!(self, Var(decl));
+		match decl.storage.lexeme() {
+			"let" => simple_decl!(self, Const(decl)),
+			"var" => simple_decl!(self, Var(decl)),
+			_ => unreachable!(),
+		}
 
 		FlowControl::Break
 	}

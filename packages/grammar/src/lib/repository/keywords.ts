@@ -8,8 +8,12 @@ export const keyword: TMGrammarScope = {
 			name: "keyword.control.$1.wgsl",
 		},
 		{
-			match: /\b(struct|fn|var|let|uniform|storage|type|export)\b/,
+			match: /\b(struct|fn|var|let|type)\b/,
 			name: "storage.type.$1.wgsl",
+		},
+		{
+			match: /\b(uniform|storage|export|read|write|read_write)\b/,
+			name: "storage.modifier.$1.wgsl",
 		},
 		{
 			match: /\b([fiu](?:8|16|32|64))\b/,
