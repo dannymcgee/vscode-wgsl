@@ -77,30 +77,22 @@ impl<'a> Dispatcher<'a> {
 	}
 
 	pub fn notify(&self, notif: Notification) {
-		match notif.try_into() {
-			Ok(event) => match event {
-				DocEvent::Open(params) => match self.documents.open(params) {
-					Ok(_) => {}
-					Err(err) => {
-						eprintln!("{}", err);
-					}
-				},
-				DocEvent::Change(_) => {} // TODO
-				DocEvent::Close(_) => {}  // TODO
-			},
-			Err(err) => {
-				eprintln!("{}", err);
+		if let Ok(event) = notif.try_into() {
+			match event {
+				DocEvent::Open(params) => {
+					let _ = self.documents.open(params);
+				}
+				DocEvent::Change(params) => {
+					let _ = self.documents.update(params);
+				}
+				DocEvent::Close(_) => {} // TODO
 			}
 		}
 	}
 
 	pub fn dispatch(&self, req: LSPRequest) {
-		match req.try_into() {
-			Ok(req) => {
-				eprintln!("[Dispatcher] Queueing request");
-				self.queue.lock().push_back(req);
-			}
-			Err(err) => eprintln!("{}", err),
+		if let Ok(req) = req.try_into() {
+			self.queue.lock().push_back(req);
 		}
 
 		match self.documents.status() {
@@ -110,18 +102,11 @@ impl<'a> Dispatcher<'a> {
 	}
 
 	fn subscribe(self, status: Receiver<Status>) {
+		// TODO: This would probably be way more efficient to do with async/await
 		thread::spawn(move || {
 			for update in status {
-				match update {
-					// FIXME - This is currently trying to process the queue with unresolved
-					// dependencies still hanging around, which causes the server to crash
-					Status::Ready => {
-						eprintln!("[Documents] Status : Ready!");
-						self.clone().process_queue();
-					}
-					Status::Pending => {
-						eprintln!("[Documents] Status : Pending...");
-					}
+				if update == Status::Ready {
+					self.clone().process_queue();
 				}
 			}
 		});
@@ -132,7 +117,6 @@ impl<'a> Dispatcher<'a> {
 
 		let mut queue = self.queue.lock();
 		while !queue.is_empty() {
-			eprintln!("[Dispatcher] Popping request");
 			match queue.pop_front().unwrap() {
 				Hover(id, params) => hover::handle(id, params, self.ipc.clone()),
 				SemanticTokens(id, params) => {
@@ -146,7 +130,6 @@ impl<'a> Dispatcher<'a> {
 				GotoDefinition(id, params) => definition::handle(id, params, self.ipc.clone()),
 			}
 		}
-		eprintln!("[Dispatcher] Queue drained");
 	}
 }
 
