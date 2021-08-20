@@ -24,7 +24,7 @@ use parking_lot::Mutex;
 use crate::{
 	definition, docsym,
 	documents_v2::{Documents, Status},
-	hover, semtok,
+	hover, semantic_tokens,
 };
 
 lazy_static! {
@@ -127,7 +127,7 @@ impl<'a> Dispatcher<'a> {
 			match queue.pop_front().unwrap() {
 				Hover(id, params) => hover::handle(id, params, self.ipc.clone()),
 				SemanticTokens(id, params) => {
-					let msg = semtok::handle(id, params, &self.documents);
+					let msg = semantic_tokens::handle(id, params, &self.documents);
 					self.ipc.send(msg).unwrap();
 				}
 				DocumentSymbols(id, params) => {

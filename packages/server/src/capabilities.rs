@@ -5,7 +5,7 @@ use lsp_types::{
 };
 use serde_json as json;
 
-use crate::semtok;
+use crate::semantic_tokens;
 
 pub fn define() -> json::Value {
 	json::to_value(&ServerCapabilities {
@@ -14,7 +14,7 @@ pub fn define() -> json::Value {
 			SemanticTokensOptions {
 				full: Some(SemanticTokensFullOptions::Bool(true)),
 				range: None,
-				legend: semtok::legend(),
+				legend: semantic_tokens::legend(),
 				..Default::default()
 			},
 		)),

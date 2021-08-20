@@ -17,7 +17,7 @@ mod documents;
 mod documents_v2;
 mod extensions;
 mod hover;
-mod semtok;
+mod semantic_tokens;
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 
