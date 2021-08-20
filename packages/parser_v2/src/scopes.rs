@@ -82,7 +82,10 @@ impl<'a> Scope<'a> {
 		self.parent.as_ref().and_then(|env| env.upgrade())
 	}
 
-	pub fn find(&self, token: &Token<'a>) -> Option<Arc<Decl<'a>>> {
+	// FIXME - This currently searches from the outermost scope inwards, which means:
+	//   1. shadowed declarations won't be correctly discovered
+	//   2. it's way less efficient than it should be
+	pub fn find(&self, token: Token<'a>) -> Option<Arc<Decl<'a>>> {
 		let (lexeme, span) = token.as_inner();
 
 		if !self.span.contains(span) {
@@ -157,7 +160,7 @@ impl<'a> ScopeBuilder<'a> {
 macro_rules! simple_decl {
 	($self:ident, $variant:ident($decl:ident)) => {{
 		let ident = $decl.name.lexeme();
-		let start = $decl.semicolon.span().end;
+		let start = $decl.name.span().start;
 
 		$self.current = $self.spawn_for_decl(start);
 		$self.current.define(ident, Decl::$variant($decl.clone()));
@@ -195,14 +198,16 @@ impl<'a> Visitor<'a> for ScopeBuilder<'a> {
 		// Create an new scope from the opening brace through the end of the current scope,
 		// and add the function declaration to it
 		let ident = decl.name.lexeme();
-		let start = decl.body.brace_open.span().end;
+		let start = decl.name.span().start;
 
 		let starting_scope = self.spawn_for_decl(start);
 		self.current = Arc::clone(&starting_scope);
 		self.current.define(ident, Decl::Function(decl.clone()));
 
 		// Create a narrower scope enclosing just the function body
-		self.current = self.spawn_for_block(&decl.body);
+		let end = decl.body.brace_close.span().start;
+		let span = Span { start, end };
+		self.current = Scope::with_parent(span, Arc::clone(&self.current));
 
 		// We need to be able to pop this scope before exiting the function body, so instead
 		// of just returning control back to the walker, we'll manually traverse our children
@@ -238,6 +243,7 @@ impl<'a> Visitor<'a> for ScopeBuilder<'a> {
 		while self.current.span != starting_scope.span {
 			self.pop_scope();
 		}
+		self.pop_scope();
 
 		FlowControl::Break
 	}
@@ -251,6 +257,7 @@ impl<'a> Visitor<'a> for ScopeBuilder<'a> {
 		while self.current.span != starting_scope.span {
 			self.pop_scope();
 		}
+		self.pop_scope();
 
 		FlowControl::Break
 	}
@@ -264,6 +271,7 @@ impl<'a> Visitor<'a> for ScopeBuilder<'a> {
 		while self.current.span != starting_scope.span {
 			self.pop_scope();
 		}
+		self.pop_scope();
 
 		FlowControl::Break
 	}
@@ -292,6 +300,7 @@ impl<'a> Visitor<'a> for ScopeBuilder<'a> {
 			while self.current.span != starting_scope.span {
 				self.pop_scope();
 			}
+			self.pop_scope();
 		}
 
 		// Create a new scope for the statement body and walk as normal
@@ -303,6 +312,7 @@ impl<'a> Visitor<'a> for ScopeBuilder<'a> {
 		while self.current.span != starting_scope.span {
 			self.pop_scope();
 		}
+		self.pop_scope();
 
 		FlowControl::Break
 	}
@@ -318,6 +328,7 @@ impl<'a> Visitor<'a> for ScopeBuilder<'a> {
 		while self.current.span != starting_scope.span {
 			self.pop_scope();
 		}
+		self.pop_scope();
 
 		FlowControl::Break
 	}
@@ -331,6 +342,7 @@ impl<'a> Visitor<'a> for ScopeBuilder<'a> {
 		while self.current.span != starting_scope.span {
 			self.pop_scope();
 		}
+		self.pop_scope();
 
 		FlowControl::Break
 	}
@@ -346,6 +358,7 @@ impl<'a> Visitor<'a> for ScopeBuilder<'a> {
 		while self.current.span != starting_scope.span {
 			self.pop_scope();
 		}
+		self.pop_scope();
 
 		FlowControl::Break
 	}

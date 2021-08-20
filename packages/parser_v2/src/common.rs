@@ -1,4 +1,7 @@
+use std::fmt;
+
 use gramatika::{Parse, ParseStreamer, Span, Spanned, SpannedError};
+use itertools::Itertools;
 
 use crate::{
 	expr::{Expr, IdentExpr},
@@ -82,7 +85,8 @@ impl<'a> Parse<'a> for Attribute<'a> {
 	type Stream = ParseStream<'a>;
 
 	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
-		let name = input.consume_kind(TokenKind::Ident)?;
+		// TODO - see note in `tokens`
+		let name = input.consume_as(TokenKind::Ident, Token::attribute)?;
 		let value = if input.check(brace!["("]) {
 			input.consume(brace!["("])?;
 			let value = input.next().ok_or_else(|| SpannedError {
@@ -267,5 +271,41 @@ impl<'a> Parse<'a> for ArgumentList<'a> {
 			arguments,
 			brace_close,
 		})
+	}
+}
+
+// TODO
+impl<'a> fmt::Display for TypeDecl<'a> {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		if let Some(namespace) = self.name.namespace {
+			write!(f, "{}::", namespace)?;
+		}
+		write!(f, "{}", self.name.name)?;
+
+		if let Some(child_ty) = self.child_ty {
+			write!(f, "<{}>", child_ty)?;
+		}
+
+		Ok(())
+	}
+}
+
+impl<'a> fmt::Display for Attribute<'a> {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "{}", self.name)?;
+
+		if let Some(value) = self.value {
+			write!(f, "({})", value)?;
+		}
+
+		Ok(())
+	}
+}
+
+impl<'a> fmt::Display for AttributeList<'a> {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		let inner = self.attributes.iter().join(", ");
+
+		write!(f, "[[{}]]", inner)
 	}
 }

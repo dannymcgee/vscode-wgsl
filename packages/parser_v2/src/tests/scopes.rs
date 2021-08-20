@@ -10,7 +10,7 @@ fn scopes() {
 	let root = scopes::build(&tree);
 
 	let test_token = Token::Ident("ambient_strength", span![77:35...77:51]);
-	if let Some(found) = root.find(&test_token) {
+	if let Some(found) = root.find(test_token) {
 		eprintln!("{:#?}", found.as_ref());
 	} else {
 		panic!();

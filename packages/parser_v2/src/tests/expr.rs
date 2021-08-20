@@ -1,6 +1,6 @@
 use gramatika::ParseStreamer;
 
-use crate::{expr::Expr, tests, ParseStream};
+use crate::{expr::Expr, stmt::Stmt, tests, ParseStream};
 
 #[test]
 fn unary_expr() {
@@ -109,6 +109,25 @@ fn limited_postfix_expr() {
 		Err(err) => {
 			eprintln!("{}", err);
 			panic!();
+		}
+	}
+}
+
+#[test]
+fn chained_method_calls() {
+	let stmt = r#"
+let specular_strength = in
+	.world_normal
+	.dot(half_dir)
+	.max(0.0)
+	.pow(32.0);
+	"#;
+	match ParseStream::from(stmt).parse::<Stmt>() {
+		Ok(tree) => {
+			eprintln!("{:#?}", tree);
+		}
+		Err(err) => {
+			eprintln!("{}", err);
 		}
 	}
 }

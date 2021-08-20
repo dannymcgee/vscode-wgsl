@@ -672,6 +672,7 @@ version = "0.1.0"
 dependencies = [
  "criterion",
  "gramatika",
+ "itertools",
  "lsp-types",
  "parking_lot",
  "parser",

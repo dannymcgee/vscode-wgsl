@@ -363,6 +363,8 @@ impl<'a> Walk<'a> for BinaryExpr<'a> {
 impl<'a> Walk<'a> for FnCallExpr<'a> {
 	fn walk(&'a self, visitor: &mut dyn Visitor<'a>) {
 		if visitor.visit_fn_call_expr(self) == FlowControl::Continue {
+			visitor.visit_ident_expr(&self.ident);
+
 			for arg in self.arguments.arguments.iter() {
 				arg.walk(visitor);
 			}

@@ -1,22 +1,15 @@
 use std::thread;
 
 use crossbeam::channel::Sender;
-use lsp_server::{Message, Response};
-use lsp_types::{
-	request::{GotoDefinition, Request},
-	GotoDefinitionParams, GotoDefinitionResponse, Location, Range,
-};
+use lsp_server::{Message, RequestId, Response};
+use lsp_types::{GotoDefinitionParams, GotoDefinitionResponse, Location, Range};
 use parser::{GetRange, IsWithin};
 use serde_json as json;
 
 use crate::documents;
 
-pub fn handle(req: lsp_server::Request, tx: Sender<Message>) {
+pub fn handle(id: RequestId, params: GotoDefinitionParams, tx: Sender<Message>) {
 	thread::spawn(move || {
-		let (id, params) = req
-			.extract::<GotoDefinitionParams>(GotoDefinition::METHOD)
-			.unwrap();
-
 		let uri = params.text_document_position_params.text_document.uri;
 		let pos = params.text_document_position_params.position;
 		let symbol_range = Range {

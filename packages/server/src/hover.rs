@@ -1,20 +1,15 @@
 use std::thread;
 
 use crossbeam::channel::Sender;
-use lsp_server::{Message, Response};
-use lsp_types::{
-	request::{HoverRequest, Request},
-	Hover, HoverContents, HoverParams, MarkupContent, MarkupKind, Range,
-};
+use lsp_server::{Message, RequestId, Response};
+use lsp_types::{Hover, HoverContents, HoverParams, MarkupContent, MarkupKind, Range};
 use parser::{GetRange, IsWithin};
 use serde_json as json;
 
 use crate::documents;
 
-pub fn handle(req: lsp_server::Request, tx: Sender<Message>) {
+pub fn handle(id: RequestId, params: HoverParams, tx: Sender<Message>) {
 	thread::spawn(move || {
-		let (id, params) = req.extract::<HoverParams>(HoverRequest::METHOD).unwrap();
-
 		let uri = params.text_document_position_params.text_document.uri;
 		let pos = params.text_document_position_params.position;
 		let hover_range = Range {

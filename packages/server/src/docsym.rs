@@ -1,56 +1,48 @@
-use std::{sync::Arc, thread};
+use std::sync::Arc;
 
-use crossbeam::channel::Sender;
 use dashmap::DashMap;
+use gramatika::Spanned;
 use itertools::Itertools;
-use lsp_server::{Message, Response};
+use lsp_server::{Message, RequestId, Response};
 use lsp_types::{
-	request::{DocumentSymbolRequest, Request},
-	DocumentSymbol, DocumentSymbolParams, DocumentSymbolResponse, Range, SymbolKind, SymbolTag,
-	Url,
+	DocumentSymbol, DocumentSymbolParams, DocumentSymbolResponse, Range, SymbolKind, SymbolTag, Url,
 };
-use parser::{
-	ast::{Decl, FunctionDecl, FunctionSignature, Pretty, StructDecl, StructField, VarDecl},
-	GetRange,
+use parser_v2::{
+	decl::{Decl, FieldDecl, FunctionDecl, StructBody, StructDecl, VarDecl},
+	utils::ToRange,
+	SyntaxTree,
 };
 use serde_json as json;
 
-use crate::documents;
+use crate::documents_v2::Documents;
 
 lazy_static! {
 	static ref CACHE: Arc<DashMap<Url, Arc<DocumentSymbolResponse>>> = Arc::new(DashMap::default());
 }
 
-pub fn handle(req: lsp_server::Request, tx: Sender<Message>) {
-	thread::spawn(move || {
-		let (id, params) = req
-			.extract::<DocumentSymbolParams>(DocumentSymbolRequest::METHOD)
-			.unwrap();
+pub fn handle(id: RequestId, params: DocumentSymbolParams, docs: &Documents) -> Message {
+	let response = if let Some(document) = docs.get(&params.text_document.uri) {
+		let symbols = Arc::clone(&document.ast).into_symbols();
+		let response = Arc::new(DocumentSymbolResponse::Nested(symbols));
+		CACHE.insert(params.text_document.uri, response.clone());
 
-		let response = match documents::parse(&params.text_document.uri) {
-			Some(ast) => {
-				let symbols = ast.into_symbols();
-				let response = Arc::new(DocumentSymbolResponse::Nested(symbols));
-				CACHE.insert(params.text_document.uri, response.clone());
+		response
+	} else {
+		// If there's some syntax error in the file, we won't be able to parse it.
+		// In this case, just retrieve the cached result if any, or an empty vec otherwise.
+		match CACHE.get(&params.text_document.uri) {
+			Some(cached_entry) => Arc::clone(cached_entry.value()),
+			None => Arc::new(DocumentSymbolResponse::Nested(vec![])),
+		}
+	};
 
-				response
-			}
-			// If there's some syntax error in the file, we won't be able to parse it.
-			// In this case, just retrieve the cached result if any, or an empty vec otherwise.
-			None => match CACHE.get(&params.text_document.uri) {
-				Some(cached_entry) => Arc::clone(cached_entry.value()),
-				None => Arc::new(DocumentSymbolResponse::Nested(vec![])),
-			},
-		};
-		let result = Some(json::to_value(response.as_ref()).unwrap());
+	let result = Some(json::to_value(response.as_ref()).unwrap());
 
-		tx.send(Message::Response(Response {
-			id,
-			result,
-			error: None,
-		}))
-		.unwrap();
-	});
+	Message::Response(Response {
+		id,
+		result,
+		error: None,
+	})
 }
 
 trait IntoSymbols {
@@ -65,7 +57,16 @@ trait Detail {
 	fn detail(&self) -> Option<String>;
 }
 
-impl IntoSymbols for Arc<Vec<Decl>> {
+impl<'a> IntoSymbols for Arc<SyntaxTree<'a>> {
+	fn into_symbols(self) -> Vec<DocumentSymbol> {
+		self.inner
+			.iter()
+			.filter_map(|decl| decl.as_symbol())
+			.collect()
+	}
+}
+
+impl<'a> IntoSymbols for Arc<Vec<Decl<'a>>> {
 	fn into_symbols(self) -> Vec<DocumentSymbol> {
 		Arc::clone(&self)
 			.iter()
@@ -74,15 +75,15 @@ impl IntoSymbols for Arc<Vec<Decl>> {
 	}
 }
 
-impl AsSymbol for Decl {
+impl<'a> AsSymbol for Decl<'a> {
 	fn as_symbol(&self) -> Option<DocumentSymbol> {
 		use Decl::*;
 
-		let ident = self.ident();
+		let ident = self.name();
 		let builder = DocSymBuilder::new()
 			.name(ident)
-			.range(self.range())
-			.selection_range(ident.range());
+			.range(self.span().to_range())
+			.selection_range(ident.span().to_range());
 
 		match self {
 			Var(ref inner) => Some(
@@ -121,26 +122,48 @@ impl AsSymbol for Decl {
 	}
 }
 
-impl IntoSymbols for &Vec<StructField> {
+impl<'a> IntoSymbols for &Vec<FieldDecl<'a>> {
 	fn into_symbols(self) -> Vec<DocumentSymbol> {
 		self.iter()
 			.map(|field| {
 				DocSymBuilder::new()
 					.kind(SymbolKind::Field)
 					.name(&field.name)
-					.detail(Some(&field.type_decl))
-					.range(field.range)
-					.selection_range(field.name.range())
+					.detail(Some(&field.ty))
+					.range(field.span().to_range())
+					.selection_range(field.name.span().to_range())
 					.build()
 			})
 			.collect()
 	}
 }
 
-impl Detail for &VarDecl {
+impl<'a> IntoSymbols for &StructBody<'a> {
+	fn into_symbols(self) -> Vec<DocumentSymbol> {
+		self.fields
+			.iter()
+			.map(|field| {
+				let field = if let Decl::Field(field) = field {
+					field
+				} else {
+					unreachable!()
+				};
+				DocSymBuilder::new()
+					.kind(SymbolKind::Field)
+					.name(&field.name)
+					.detail(Some(&field.ty))
+					.range(field.span().to_range())
+					.selection_range(field.name.span().to_range())
+					.build()
+			})
+			.collect()
+	}
+}
+
+impl<'a> Detail for &VarDecl<'a> {
 	fn detail(&self) -> Option<String> {
-		let attr_detail = self.attributes.as_ref().map(|attr| attr.pretty());
-		let type_detail = self.type_decl.as_ref().map(|ty| ty.to_string());
+		let attr_detail = self.attributes.as_ref();
+		let type_detail = self.ty.as_ref().map(|ty| ty.to_string());
 		let combine = |a, b| format!("{} {}", a, b);
 
 		attr_detail
@@ -149,48 +172,49 @@ impl Detail for &VarDecl {
 	}
 }
 
-impl Detail for &StructDecl {
+impl<'a> Detail for &StructDecl<'a> {
 	fn detail(&self) -> Option<String> {
 		self.attributes
 			.as_ref()
-			.map(|attributes| attributes.pretty())
+			.map(|attributes| attributes.to_string())
 	}
 }
 
-impl Detail for &StructField {
+impl<'a> Detail for &FieldDecl<'a> {
 	fn detail(&self) -> Option<String> {
-		let type_detail = self.type_decl.to_string();
-
 		self.attributes
 			.as_ref()
-			.map(|attr| format!("{} {}", attr.pretty(), type_detail))
-			.or(Some(type_detail))
+			.map(|attr| format!("{} {}", attr, self.ty))
+			.or_else(|| Some(self.ty.to_string()))
 	}
 }
 
-impl Detail for &FunctionDecl {
+impl<'a> Detail for &FunctionDecl<'a> {
 	fn detail(&self) -> Option<String> {
-		let sig_detail = (&self.signature).detail().unwrap();
+		let params = self
+			.params
+			.iter()
+			.map(|param| {
+				if let Decl::Param(param) = param {
+					format!("{}: {}", param.name, param.ty)
+				} else {
+					unreachable!()
+				}
+			})
+			.join(", ");
+
+		let return_ty = if let Some(return_ty) = self.return_ty.as_ref() {
+			format!(" -> {}", return_ty)
+		} else {
+			"".into()
+		};
+
+		let sig_detail = format!("fn ({}){}", params, return_ty);
 
 		self.attributes
 			.as_ref()
-			.map(|attr| format!("{} {}", attr.pretty(), sig_detail))
+			.map(|attr| format!("{} {}", attr, sig_detail))
 			.or(Some(sig_detail))
-	}
-}
-
-impl Detail for &FunctionSignature {
-	fn detail(&self) -> Option<String> {
-		Some(format!(
-			"fn({}){}",
-			self.params
-				.iter()
-				.map(|param| param.type_decl.to_string())
-				.join(", "),
-			self.return_type
-				.as_ref()
-				.map_or("".to_string(), |ty| format!(" -> {}", ty))
-		))
 	}
 }
 
@@ -216,7 +240,9 @@ impl DocSymBuilder {
 	}
 
 	fn name<S>(mut self, name: S) -> Self
-	where S: ToString {
+	where
+		S: ToString,
+	{
 		self.name = Some(name.to_string());
 		self
 	}
@@ -232,7 +258,9 @@ impl DocSymBuilder {
 	}
 
 	fn detail<S>(mut self, detail: Option<S>) -> Self
-	where S: ToString {
+	where
+		S: ToString,
+	{
 		self.detail = detail.map(|inner| inner.to_string());
 		self
 	}

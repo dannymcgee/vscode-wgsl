@@ -9,7 +9,7 @@ use crate::semtok;
 
 pub fn define() -> json::Value {
 	json::to_value(&ServerCapabilities {
-		hover_provider: Some(HoverProviderCapability::Simple(true)),
+		// hover_provider: Some(HoverProviderCapability::Simple(true)),
 		semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(
 			SemanticTokensOptions {
 				full: Some(SemanticTokensFullOptions::Bool(true)),
@@ -22,7 +22,7 @@ pub fn define() -> json::Value {
 			label: None,
 			work_done_progress_options: WorkDoneProgressOptions::default(),
 		})),
-		definition_provider: Some(OneOf::Left(true)),
+		// definition_provider: Some(OneOf::Left(true)),
 		text_document_sync: Some(TextDocumentSyncCapability::Kind(
 			TextDocumentSyncKind::Incremental,
 		)),

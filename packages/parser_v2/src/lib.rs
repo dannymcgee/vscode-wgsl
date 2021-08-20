@@ -18,7 +18,7 @@ pub use token::{Lexer, Token, TokenKind, *};
 
 #[derive(DebugLisp)]
 pub struct SyntaxTree<'a> {
-	inner: Vec<Decl<'a>>,
+	pub inner: Vec<Decl<'a>>,
 }
 
 impl<'a> Parse<'a> for SyntaxTree<'a> {

@@ -2,7 +2,7 @@ use core::fmt;
 
 use gramatika::{Span, Spanned, Token as _};
 
-#[derive(Clone, Copy, DebugLispToken, Token, Lexer)]
+#[derive(Clone, Copy, DebugLispToken, Hash, Token, Lexer)]
 pub enum Token<'a> {
 	#[pattern = r"\[\[?|\]\]?|[(){}]"]
 	Brace(&'a str, Span),
@@ -54,15 +54,29 @@ pub enum Token<'a> {
 
 	#[pattern = r"::?|[,.;]"]
 	Punct(&'a str, Span),
+
+	// Tokens without patterns -- need to be upgraded via `ParseStream::consume_as`
+
+	// TODO - I implemented this for the sake of semantic tokens, but I'm pretty sure I
+	// didn't end up actually using it. Should investigate whether this is worth keeping
+	// around or not.
+	Attribute(&'a str, Span),
+	Function(&'a str, Span),
+	Param(&'a str, Span),
+	Struct(&'a str, Span),
+	Field(&'a str, Span),
+	Module(&'a str, Span),
 }
-// Attr(&'a str, Span),
-// Field(&'a str, Span),
-// Function(&'a str, Span),
-// Module(&'a str, Span),
 
 impl<'a> fmt::Debug for Token<'a> {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		<Self as gramatika::DebugLisp>::fmt(self, f, 0)
+	}
+}
+
+impl<'a> fmt::Display for Token<'a> {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "{}", self.lexeme())
 	}
 }
 

@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2018"
 
 [dependencies]
+itertools = "*"
 gramatika = { path = "../../../../gramatika/crates/gramatika" }
 lsp-types = "0.89"
 parking_lot = "0.11"

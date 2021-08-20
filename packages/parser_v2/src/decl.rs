@@ -98,6 +98,21 @@ pub struct ModuleDecl<'a> {
 	pub semicolon: Token<'a>,
 }
 
+impl<'a> Decl<'a> {
+	pub fn name(&self) -> Token<'a> {
+		match self {
+			Decl::Var(decl) | Decl::Const(decl) => decl.name,
+			Decl::TypeAlias(decl) => decl.name,
+			Decl::Struct(decl) => decl.name,
+			Decl::Field(decl) => decl.name,
+			Decl::Function(decl) => decl.name,
+			Decl::Param(decl) => decl.name,
+			Decl::Extension(decl) => decl.name,
+			Decl::Module(decl) => decl.name,
+		}
+	}
+}
+
 impl<'a> Parse<'a> for Decl<'a> {
 	type Stream = ParseStream<'a>;
 
@@ -347,7 +362,7 @@ impl<'a> Parse<'a> for FieldDecl<'a> {
 		} else {
 			None
 		};
-		let name = input.consume_kind(TokenKind::Ident)?;
+		let name = input.consume_as(TokenKind::Ident, Token::field)?;
 		let ty = input.parse()?;
 		let semicolon = input.consume(punct![;])?;
 
@@ -482,7 +497,7 @@ impl<'a> Parse<'a> for ExtensionDecl<'a> {
 
 	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
 		let keyword = input.consume(keyword![enable])?;
-		let name = input.consume_kind(TokenKind::Ident)?;
+		let name = input.consume_as(TokenKind::Ident, Token::Module)?;
 		input.consume(punct![;])?;
 
 		Ok(Self { keyword, name })
@@ -500,7 +515,7 @@ impl<'a> Parse<'a> for ModuleDecl<'a> {
 
 	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
 		let import_kw = input.consume(keyword![import])?;
-		let name = input.consume_kind(TokenKind::Ident)?;
+		let name = input.consume_as(TokenKind::Ident, Token::Module)?;
 		let from_kw = input.consume(keyword![from])?;
 		let path = input.consume_kind(TokenKind::Path)?;
 		let semicolon = input.consume(punct![;])?;
