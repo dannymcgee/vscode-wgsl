@@ -96,7 +96,10 @@ impl<'a> Dispatcher<'a> {
 
 	pub fn dispatch(&self, req: LSPRequest) {
 		match req.try_into() {
-			Ok(req) => self.queue.lock().push_back(req),
+			Ok(req) => {
+				eprintln!("[Dispatcher] Queueing request");
+				self.queue.lock().push_back(req);
+			}
 			Err(err) => eprintln!("{}", err),
 		}
 
@@ -112,8 +115,13 @@ impl<'a> Dispatcher<'a> {
 				match update {
 					// FIXME - This is currently trying to process the queue with unresolved
 					// dependencies still hanging around, which causes the server to crash
-					Status::Ready => self.clone().process_queue(),
-					Status::Pending => {}
+					Status::Ready => {
+						eprintln!("[Documents] Status : Ready!");
+						self.clone().process_queue();
+					}
+					Status::Pending => {
+						eprintln!("[Documents] Status : Pending...");
+					}
 				}
 			}
 		});
@@ -124,6 +132,7 @@ impl<'a> Dispatcher<'a> {
 
 		let mut queue = self.queue.lock();
 		while !queue.is_empty() {
+			eprintln!("[Dispatcher] Popping request");
 			match queue.pop_front().unwrap() {
 				Hover(id, params) => hover::handle(id, params, self.ipc.clone()),
 				SemanticTokens(id, params) => {
@@ -137,6 +146,7 @@ impl<'a> Dispatcher<'a> {
 				GotoDefinition(id, params) => definition::handle(id, params, self.ipc.clone()),
 			}
 		}
+		eprintln!("[Dispatcher] Queue drained");
 	}
 }
 
