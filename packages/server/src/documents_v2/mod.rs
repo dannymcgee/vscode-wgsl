@@ -9,18 +9,21 @@ use lsp_types::{
 	notification::Notification as _, DidChangeTextDocumentParams as UpdateParams,
 	DidOpenTextDocumentParams as OpenParams, Url,
 };
-use parking_lot::RwLock;
 use parser_v2::{
 	decl::ModuleDecl,
 	scopes::{self, Scope},
 	traversal::{Visitor, Walk},
 	ParseStreamer, SyntaxTree, Token,
 };
-use ropey::Rope;
 use serde_json as json;
 use wgsl_plus::ResolveImportPath;
 
+mod document;
+mod finder;
+
 use crate::extensions::{UnreadDependency, UnreadDependencyParams};
+pub use document::Document;
+use finder::{DeclFinder, FindDeclResult};
 
 lazy_static! {
 	static ref DOCS: Arc<DashMap<Url, SyntaxTree<'static>>> = Arc::new(DashMap::new());
@@ -37,17 +40,6 @@ pub struct Documents<'a> {
 	pending: Arc<DashSet<Url>>,
 	ipc: Sender<Message>,
 	status_tx: Sender<Status>,
-}
-
-pub struct Document<'a> {
-	pub uri: Url,
-	pub source: String,
-	pub tokens: Vec<Token<'a>>,
-	pub ast: Arc<SyntaxTree<'a>>,
-	pub deps: Arc<HashMap<&'a str, Url>>,
-	pub scopes: Arc<Scope<'a>>,
-	rope: Arc<RwLock<Rope>>,
-	status: Status,
 }
 
 impl<'a> Documents<'a> {
@@ -159,66 +151,21 @@ impl<'a> Documents<'a> {
 			.get(uri)
 			.map(|entry| unsafe { (entry.value() as *const Document).as_ref().unwrap() })
 	}
-}
 
-impl<'a> Document<'a> {
-	fn new(text: String, uri: Url) -> parser_v2::Result<'a, Self> {
-		let (ast, source, tokens) = parse(text)?;
-		let (scopes, deps) = build_scope_tree(&ast, &uri);
+	pub fn find_decl(&self, uri: Url, token: Token<'a>) -> Option<FindDeclResult<'a>> {
+		let document = self.get(&uri)?;
 
-		let status = if deps.is_empty() {
-			Status::Ready
-		} else {
-			Status::Pending
-		};
+		let tree = document.ast.as_ref();
+		let scope = Arc::clone(&document.scopes);
+		let deps = Arc::clone(&document.deps)
+			.iter()
+			.map(|(name, uri)| (*name, self.get(uri).unwrap()))
+			.collect();
 
-		let rope = Arc::new(RwLock::new(Rope::from_str(&source)));
+		let mut finder = DeclFinder::new(scope, deps, token);
+		tree.walk(&mut finder);
 
-		Ok(Self {
-			uri,
-			source,
-			tokens,
-			ast: Arc::new(ast),
-			deps,
-			scopes,
-			rope,
-			status,
-		})
-	}
-
-	fn update(&mut self, params: UpdateParams) -> parser_v2::Result<()> {
-		let mut source = self.rope.write();
-		for update in &params.content_changes {
-			let range = update.range.unwrap();
-
-			let start_line = source.line_to_char(range.start.line as usize);
-			let edit_start = start_line + range.start.character as usize;
-
-			let end_line = source.line_to_char(range.end.line as usize);
-			let edit_end = end_line + range.end.character as usize;
-
-			if edit_end - edit_start > 0 {
-				source.remove(edit_start..edit_end);
-			}
-			source.insert(edit_start, &update.text);
-		}
-
-		let (ast, source, tokens) = parse(source.to_string())?;
-		self.source = source;
-		self.tokens = tokens;
-
-		let (scopes, deps) = build_scope_tree(&ast, &self.uri);
-		self.ast = Arc::new(ast);
-		self.deps = deps;
-		self.scopes = scopes;
-
-		self.status = if self.deps.is_empty() {
-			Status::Ready
-		} else {
-			Status::Pending
-		};
-
-		Ok(())
+		finder.result()
 	}
 }
 
@@ -242,20 +189,17 @@ fn build_scope_tree<'a>(
 			tree.as_ref().unwrap(),
 		);
 
-		// eprintln!("[Documents] Resolving dependencies : {}", uri);
 		let mut deps = DependencyResolver::new(uri);
 		tree.walk(&mut deps);
 
-		// eprintln!("[Documents] Building scope tree : {}", uri);
 		(scopes::build(tree), deps)
 	};
 
 	let deps = Arc::new(deps.dependencies);
 
 	// FIXME: This function does two things instead of one purely because both operations
-	// need an AST with an unsafely extended lifetime, and doing that once instead of twice
-	// is more sustainable (if you could call it that). When the lifetimes are fixed, this
-	// function should probably be split up.
+	// need an AST with an unsafely extended lifetime, and doing that once is preferable to
+	// doing it twice. When the lifetimes are fixed, this function should probably be split up.
 	(scopes, deps)
 }
 

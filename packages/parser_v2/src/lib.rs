@@ -4,6 +4,7 @@ extern crate gramatika;
 pub mod common;
 pub mod decl;
 pub mod expr;
+pub mod fmt;
 pub mod scopes;
 pub mod stmt;
 pub mod token;

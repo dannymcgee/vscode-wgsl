@@ -118,7 +118,10 @@ impl<'a> Dispatcher<'a> {
 		let mut queue = self.queue.lock();
 		while !queue.is_empty() {
 			match queue.pop_front().unwrap() {
-				Hover(id, params) => hover::handle(id, params, self.ipc.clone()),
+				Hover(id, params) => {
+					let msg = hover::handle(id, params, &self.documents);
+					self.ipc.send(msg).unwrap();
+				}
 				SemanticTokens(id, params) => {
 					let msg = semantic_tokens::handle(id, params, &self.documents);
 					self.ipc.send(msg).unwrap();

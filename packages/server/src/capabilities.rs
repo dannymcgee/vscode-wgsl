@@ -9,7 +9,7 @@ use crate::semantic_tokens;
 
 pub fn define() -> json::Value {
 	json::to_value(&ServerCapabilities {
-		// hover_provider: Some(HoverProviderCapability::Simple(true)),
+		hover_provider: Some(HoverProviderCapability::Simple(true)),
 		semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(
 			SemanticTokensOptions {
 				full: Some(SemanticTokensFullOptions::Bool(true)),

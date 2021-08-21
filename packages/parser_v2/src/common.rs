@@ -1,7 +1,4 @@
-use std::fmt;
-
 use gramatika::{Parse, ParseStreamer, Span, Spanned, SpannedError};
-use itertools::Itertools;
 
 use crate::{
 	expr::{Expr, IdentExpr},
@@ -271,41 +268,5 @@ impl<'a> Parse<'a> for ArgumentList<'a> {
 			arguments,
 			brace_close,
 		})
-	}
-}
-
-// TODO
-impl<'a> fmt::Display for TypeDecl<'a> {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		if let Some(namespace) = self.name.namespace {
-			write!(f, "{}::", namespace)?;
-		}
-		write!(f, "{}", self.name.name)?;
-
-		if let Some(child_ty) = self.child_ty {
-			write!(f, "<{}>", child_ty)?;
-		}
-
-		Ok(())
-	}
-}
-
-impl<'a> fmt::Display for Attribute<'a> {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(f, "{}", self.name)?;
-
-		if let Some(value) = self.value {
-			write!(f, "({})", value)?;
-		}
-
-		Ok(())
-	}
-}
-
-impl<'a> fmt::Display for AttributeList<'a> {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		let inner = self.attributes.iter().join(", ");
-
-		write!(f, "[[{}]]", inner)
 	}
 }

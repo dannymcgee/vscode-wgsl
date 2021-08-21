@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use gramatika::{Spanned, Token as _};
 use itertools::Itertools;
@@ -40,7 +40,7 @@ fn get_semantic_tokens(uri: Url, docs: &Documents) -> SemanticTokens {
 	let deps = Arc::clone(&document.deps)
 		.iter()
 		.map(|(name, uri)| (*name, docs.get(uri).unwrap()))
-		.collect::<HashMap<_, _>>();
+		.collect();
 
 	let mut builder = SemanticTokensBuilder::new(scopes, deps);
 	tree.walk(&mut builder);

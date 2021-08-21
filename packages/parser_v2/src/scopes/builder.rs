@@ -1,116 +1,16 @@
-//! This module is responsible for building a tree of scopes from an AST, according to the
-//! following rules:
-//!
-//!  * Most declarations spawn a new child scope which is valid through the end of the
-//!    scope which contains it. The starting point for declaration scopes depends on the
-//!    type of declaration:
-//!     - `var`, `let`, `type`, and `struct` bindings become active after their semicolon
-//!     - `fn` bindings become active after their opening brace
-//!  * Block statements (generally any chunk of code enclosed in curly braces, e.g.
-//!    following an `if` statement's condition expression) spawn a new child scope from
-//!    the end of the opening brace to the start of the closing brace
-//!
-//! There are a few special cases to be aware of:
-//!
-//!  * Parameter bindings are valid within their function body, but don't spawn new scopes
-//!    of their own
-//!  * Bindings declared in the initializer of a `for` statement are valid within the
-//!    statement's body, and within the condition and increment expressions
-//!  * Struct fields can only be accessed through a `dot` postfix attached to an
-//!    identifier that binds to an instance of the struct, so their declarations are not
-//!    directly represented in the scopes tree
-//!
-//! Once the `Scopes` object has been constructed, the declaration for any given
-//! identifier binding can be found by querying the `Scopes` instance for the identifier's
-//! `Token`. If the declaration is not found, either something has gone terribly wrong or
-//! the identifier is invalid.
-
-use std::{
-	collections::HashMap,
-	sync::{Arc, Weak},
-};
+use std::sync::Arc;
 
 use gramatika::{Position, Span, Spanned, Token as _};
-use parking_lot::Mutex;
 
+use super::Scope;
 use crate::{
 	decl::{Decl, FunctionDecl, ModuleDecl, ParamDecl, StructDecl, TypeAliasDecl, VarDecl},
 	stmt::{BlockStmt, CaseStmt, ContinuingStmt, ElseStmt, ForStmt, IfStmt, LoopStmt, Stmt},
 	traversal::{FlowControl, Visitor, Walk},
-	SyntaxTree, Token,
+	Token,
 };
 
-/// A mapping of identifier names to their declarations
-pub type Bindings<'a> = HashMap<&'a str, Arc<Decl<'a>>>;
-
-pub struct Scope<'a> {
-	span: Span,
-	parent: Option<Weak<Scope<'a>>>,
-	children: Mutex<Vec<Arc<Scope<'a>>>>,
-	bindings: Arc<Mutex<Bindings<'a>>>,
-}
-
-pub fn build<'a>(syntax_tree: &'a SyntaxTree<'a>) -> Arc<Scope<'a>> {
-	let span = syntax_tree.span();
-	let mut builder = ScopeBuilder::new(span);
-
-	syntax_tree.walk(&mut builder);
-	builder.build()
-}
-
-impl<'a> Scope<'a> {
-	pub fn new(span: Span) -> Self {
-		Self {
-			span,
-			parent: None,
-			children: Mutex::new(vec![]),
-			bindings: Arc::new(Mutex::new(HashMap::default())),
-		}
-	}
-
-	pub fn with_parent(span: Span, parent: Arc<Scope<'a>>) -> Arc<Self> {
-		let mut this = Self::new(span);
-		this.parent = Some(Arc::downgrade(&parent));
-
-		let arc_this = Arc::new(this);
-		parent.children.lock().push(Arc::clone(&arc_this));
-
-		arc_this
-	}
-
-	pub fn parent(&self) -> Option<Arc<Scope<'a>>> {
-		self.parent.as_ref().and_then(|env| env.upgrade())
-	}
-
-	// FIXME - This currently searches from the outermost scope inwards, which means:
-	//   1. shadowed declarations won't be correctly discovered
-	//   2. it's way less efficient than it should be
-	pub fn find(&self, token: Token<'a>) -> Option<Arc<Decl<'a>>> {
-		let (lexeme, span) = token.as_inner();
-
-		if !self.span.contains(span) {
-			None
-		} else if self.bindings.lock().contains_key(lexeme) {
-			self.bindings
-				.lock()
-				.get(lexeme)
-				.map(|decl| Arc::clone(decl))
-		} else {
-			self.children
-				.lock()
-				.iter()
-				.find_map(|env| env.find(token))
-				.as_ref()
-				.map(|decl| Arc::clone(decl))
-		}
-	}
-
-	fn define(&self, ident: &'a str, decl: Decl<'a>) {
-		self.bindings.lock().insert(ident, Arc::new(decl));
-	}
-}
-
-struct ScopeBuilder<'a> {
+pub(super) struct ScopeBuilder<'a> {
 	// We need to hold a persistent reference to the root, because each node holds only a
 	// weak reference to its parent, but a strong reference to each of its children. If we
 	// didn't keep a separate reference to the root, each parent would be dropped and de-
@@ -120,13 +20,17 @@ struct ScopeBuilder<'a> {
 }
 
 impl<'a> ScopeBuilder<'a> {
-	fn new(span: Span) -> Self {
+	pub(super) fn new(span: Span) -> Self {
 		let root = Arc::new(Scope::new(span));
 
 		Self {
 			root: Arc::clone(&root),
 			current: root,
 		}
+	}
+
+	pub(super) fn build(self) -> Arc<Scope<'a>> {
+		self.root
 	}
 
 	fn spawn_for_decl(&self, start: Position) -> Arc<Scope<'a>> {
@@ -150,10 +54,6 @@ impl<'a> ScopeBuilder<'a> {
 		} else {
 			eprintln!("WARNING: No parent scope!");
 		}
-	}
-
-	fn build(self) -> Arc<Scope<'a>> {
-		self.root
 	}
 }
 

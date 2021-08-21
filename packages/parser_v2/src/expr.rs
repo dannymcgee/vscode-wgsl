@@ -133,20 +133,12 @@ impl<'a> Spanned for Expr<'a> {
 			Expr::Unary(inner) => inner.op.span().through(inner.expr.span()),
 			Expr::Binary(inner) => inner.lhs.span().through(inner.rhs.span()),
 			Expr::Assignment(inner) => inner.lhs.span().through(inner.rhs.span()),
-			Expr::FnCall(inner) => inner
-				.ident
-				.name
-				.span()
-				.through(inner.arguments.brace_close.span()),
+			Expr::FnCall(inner) => inner.span(),
 			Expr::TypeCtor(inner) => inner.ty.span().through(inner.arguments.brace_close.span()),
 			Expr::Group(inner) => inner.brace_open.span().through(inner.brace_close.span()),
 			Expr::Bitcast(inner) => inner.keyword.span().through(inner.expr.brace_close.span()),
 			Expr::Literal(inner) => inner.span(),
-			Expr::Ident(inner) => inner
-				.namespace
-				.unwrap_or(inner.name)
-				.span()
-				.through(inner.name.span()),
+			Expr::Ident(inner) => inner.span(),
 			Expr::Primary(inner) => inner.span(),
 		}
 	}
@@ -176,6 +168,12 @@ impl<'a> Spanned for IdentExpr<'a> {
 			Some(ref token) => token.span().through(self.name.span()),
 			None => self.name.span(),
 		}
+	}
+}
+
+impl<'a> Spanned for FnCallExpr<'a> {
+	fn span(&self) -> Span {
+		self.ident.span().through(self.arguments.brace_close.span())
 	}
 }
 

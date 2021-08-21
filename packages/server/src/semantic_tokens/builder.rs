@@ -161,17 +161,20 @@ impl<'a> Visitor<'a> for SemanticTokensBuilder<'a> {
 		}
 		// Otherwise, try looking up the declaration in the document's scope tree.
 		else if let token @ Token::Ident(_, _) = expr.name {
-			let sem_tok = self.scopes.find(token).map(|decl| match decl.as_ref() {
-				Decl::Struct(_) => (TokenType::Struct, 0),
-				Decl::TypeAlias(_) => (TokenType::Type, 0),
-				Decl::Function(_) => (TokenType::Function, 0),
-				Decl::Var(_) => (TokenType::Variable, 0),
-				Decl::Const(_) => (TokenType::Variable, TokenMod::Readonly as u32),
-				Decl::Field(_) => unreachable!(),
-				Decl::Param(_) => (TokenType::Parameter, 0),
-				Decl::Extension(_) => (TokenType::Namespace, 0),
-				Decl::Module(_) => (TokenType::Namespace, 0),
-			});
+			let sem_tok = self
+				.scopes
+				.find_decl(token)
+				.map(|decl| match decl.as_ref() {
+					Decl::Struct(_) => (TokenType::Struct, 0),
+					Decl::TypeAlias(_) => (TokenType::Type, 0),
+					Decl::Function(_) => (TokenType::Function, 0),
+					Decl::Var(_) => (TokenType::Variable, 0),
+					Decl::Const(_) => (TokenType::Variable, TokenMod::Readonly as u32),
+					Decl::Field(_) => unreachable!(),
+					Decl::Param(_) => (TokenType::Parameter, 0),
+					Decl::Extension(_) => (TokenType::Namespace, 0),
+					Decl::Module(_) => (TokenType::Namespace, 0),
+				});
 
 			if let Some((ttype, tmod)) = sem_tok {
 				self.result.insert(token, (ttype, tmod));
