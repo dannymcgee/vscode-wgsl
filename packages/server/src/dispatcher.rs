@@ -130,7 +130,10 @@ impl<'a> Dispatcher<'a> {
 					let msg = docsym::handle(id, params, &self.documents);
 					self.ipc.send(msg).unwrap();
 				}
-				GotoDefinition(id, params) => definition::handle(id, params, self.ipc.clone()),
+				GotoDefinition(id, params) => {
+					let msg = definition::handle(id, params, &self.documents);
+					self.ipc.send(msg).unwrap();
+				}
 			}
 		}
 	}

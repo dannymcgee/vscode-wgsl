@@ -1,45 +1,59 @@
-use std::thread;
-
-use crossbeam::channel::Sender;
+use gramatika::{span, Spanned, Token as _};
 use lsp_server::{Message, RequestId, Response};
-use lsp_types::{GotoDefinitionParams, GotoDefinitionResponse, Location, Range};
-use parser::{GetRange, IsWithin};
+use lsp_types::{GotoDefinitionParams, GotoDefinitionResponse, Location};
+use parser_v2::{decl::Decl, utils::ToRange, Token};
 use serde_json as json;
+use wgsl_plus::ResolveImportPath;
 
-use crate::documents;
+use crate::documents_v2::Documents;
 
-pub fn handle(id: RequestId, params: GotoDefinitionParams, tx: Sender<Message>) {
-	thread::spawn(move || {
-		let uri = params.text_document_position_params.text_document.uri;
-		let pos = params.text_document_position_params.position;
-		let symbol_range = Range {
-			start: pos,
-			end: pos,
-		};
+pub fn handle(id: RequestId, params: GotoDefinitionParams, docs: &Documents) -> Message {
+	let uri = params.text_document_position_params.text_document.uri;
+	let pos = params.text_document_position_params.position;
 
-		let result = documents::tokens(&uri)
-			.and_then(|tokens| {
-				tokens
-					.iter()
-					.find(|token| symbol_range.is_within(&token.range()))
-					.cloned()
-			})
-			.and_then(|token| documents::scopes(&uri).and_then(|scopes| scopes.find_decl(&token)))
-			.map(|decl| {
-				let uri = decl.uri.unwrap_or(uri);
-				let range = decl.decl.ident().range();
+	let result = docs
+		.get(&uri)
+		.and_then(|document| {
+			let tokens = &document.tokens;
+			let needle = tokens.iter().find(|token| {
+				let range = token.span().to_range();
+				pos >= range.start && pos <= range.end
+			})?;
 
-				let result = GotoDefinitionResponse::Scalar(Location { uri, range });
+			match *needle {
+				Token::Path(lexeme, _) => {
+					let path = &lexeme[1..lexeme.len() - 1];
+					let uri = uri.resolve_import(path);
 
-				json::to_value(&result).unwrap()
-			})
-			.or_else(|| Some(json::to_value(&GotoDefinitionResponse::Array(vec![])).unwrap()));
+					Some(GotoDefinitionResponse::Scalar(Location {
+						uri,
+						range: span![0:0...0:0].to_range(),
+					}))
+				}
+				other => docs.find_decl(uri.clone(), other).map(|found| {
+					let range = found.decl.name().span().to_range();
+					let uri = found
+						.source_module
+						.and_then(|module| match module.as_ref() {
+							Decl::Module(inner) => {
+								let path = inner.path.lexeme();
+								let path = &path[1..path.len() - 1];
 
-		tx.send(Message::Response(Response {
-			id,
-			result,
-			error: None,
-		}))
-		.unwrap();
-	});
+								Some(uri.resolve_import(path))
+							}
+							_ => None,
+						})
+						.unwrap_or(uri);
+
+					GotoDefinitionResponse::Scalar(Location { uri, range })
+				}),
+			}
+		})
+		.unwrap_or_else(|| GotoDefinitionResponse::Array(vec![]));
+
+	Message::Response(Response {
+		id,
+		result: Some(json::to_value(&result).unwrap()),
+		error: None,
+	})
 }
