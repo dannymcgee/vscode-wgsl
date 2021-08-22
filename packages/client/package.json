@@ -26,6 +26,12 @@
 					".wgsl"
 				],
 				"configuration": "./wgsl.config.json"
+			},
+			{
+				"id": "wgsl-ast",
+				"extensions": [
+					".wgsl-ast"
+				]
 			}
 		],
 		"grammars": [
@@ -33,6 +39,18 @@
 				"language": "wgsl",
 				"scopeName": "source.wgsl",
 				"path": "./wgsl.tmLanguage.json"
+			},
+			{
+				"language": "wgsl-ast",
+				"scopeName": "source.wgsl-ast",
+				"path": "./wgsl-ast.tmLanguage.json"
+			}
+		],
+		"commands": [
+			{
+				"command": "wgsl.debugAst",
+				"title": "(debug) Show Syntax Tree",
+				"category": "WGSL"
 			}
 		]
 	},

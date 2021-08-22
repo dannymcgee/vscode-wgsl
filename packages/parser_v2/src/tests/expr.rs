@@ -83,28 +83,28 @@ fn limited_postfix_expr() {
 (Expr::Binary (BinaryExpr
 	lhs: (Expr::Primary (PrimaryExpr
 		expr: (Expr::Ident (IdentExpr
-			name: `light` (Ident (0:0...0:5)),
+			name: `light` (Ident (1:1...1:6)),
 		)),
 		postfix: (PostfixExpr
-			accessor: (Accessor::Dot `.` (Punct (0:5...0:6))),
+			accessor: (Accessor::Dot `.` (Punct (1:6...1:7))),
 			expr: (Expr::Primary (PrimaryExpr
 				expr: (Expr::Ident (IdentExpr
-					name: `color` (Ident (0:6...0:11)),
+					name: `color` (Ident (1:7...1:12)),
 				)),
 			)),
 		),
 	)),
-	op: `*` (Operator (0:12...0:13)),
+	op: `*` (Operator (1:13...1:14)),
 	rhs: (Expr::Primary (PrimaryExpr
 		expr: (Expr::Ident (IdentExpr
-			name: `ambient_strength` (Ident (0:14...0:30)),
+			name: `ambient_strength` (Ident (1:15...1:31)),
 		)),
 	)),
 ))
 			"#;
-			let expected = expected.trim().replace('\t', "   ");
+			let expected = expected.trim().replace('\t', "  ");
 
-			assert_eq!(parsed, expected, "{}", tests::diff(&parsed, &expected));
+			assert_eq!(parsed, expected, "\n{}", tests::diff(&parsed, &expected));
 		}
 		Err(err) => {
 			eprintln!("{}", err);

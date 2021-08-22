@@ -9,7 +9,11 @@
 				"build": {
 					"executor": "@vscode-devkit/nx:build",
 					"options": {
-						"additionalTargets": ["grammar:build", "server:build"],
+						"additionalTargets": [
+							"grammar:build",
+							"grammar-ast:build",
+							"server:build"
+						],
 						"assets": ["package.json", "README.md", "wgsl.config.json"],
 						"entryPoint": "src/index.ts",
 						"outputPath": "dist/vscode-wgsl",
@@ -44,6 +48,27 @@
 					"executor": "@nrwl/linter:eslint",
 					"options": {
 						"lintFilePatterns": ["packages/grammar/**/*.ts"]
+					}
+				}
+			}
+		},
+		"grammar-ast": {
+			"root": "packages/grammar-ast",
+			"sourceRoot": "packages/grammar-ast/src",
+			"projectType": "library",
+			"targets": {
+				"build": {
+					"executor": "@vscode-devkit/nx:grammar",
+					"options": {
+						"name": "wgsl-ast",
+						"entryPoint": "packages/grammar-ast/src/index.ts",
+						"outputPath": "dist/vscode-wgsl"
+					}
+				},
+				"lint": {
+					"executor": "@nrwl/linter:eslint",
+					"options": {
+						"lintFilePatterns": ["packages/grammar-ast/**/*.ts"]
 					}
 				}
 			}

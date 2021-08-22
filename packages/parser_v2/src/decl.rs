@@ -142,7 +142,7 @@ impl<'a> Parse<'a> for Decl<'a> {
 					}
 					_ => Err(SpannedError {
 						message: "Attributes are not valid in this position".into(),
-						span: Some(attributes.unwrap().span),
+						span: Some(attributes.unwrap().span()),
 						source: input.source(),
 					}),
 				}

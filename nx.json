@@ -29,9 +29,12 @@
 	"projects": {
 		"client": {
 			"tags": [],
-			"implicitDependencies": ["grammar", "server"]
+			"implicitDependencies": ["grammar", "grammar-ast", "server"]
 		},
 		"grammar": {
+			"tags": []
+		},
+		"grammar-ast": {
 			"tags": []
 		},
 		"parser": {

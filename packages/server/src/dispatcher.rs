@@ -22,8 +22,9 @@ use lsp_types::{
 use parking_lot::Mutex;
 
 use crate::{
-	definition, docsym,
+	debug_ast, definition, docsym,
 	documents_v2::{Documents, Status},
+	extensions::{DebugAst, DebugAstParams},
 	hover, semantic_tokens,
 };
 
@@ -36,6 +37,7 @@ enum Request {
 	SemanticTokens(RequestId, SemanticTokensParams),
 	DocumentSymbols(RequestId, DocumentSymbolParams),
 	GotoDefinition(RequestId, GotoDefinitionParams),
+	DebugAst(RequestId, DebugAstParams),
 }
 
 enum DocEvent {
@@ -59,6 +61,17 @@ impl<'a> Clone for Dispatcher<'a> {
 			queue: Arc::clone(&self.queue),
 			documents: Arc::clone(&self.documents),
 			ipc: self.ipc.clone(),
+		}
+	}
+}
+
+macro_rules! handle {
+	($self:ident, $queue:ident, { $($req_variant:ident => $handler:path),*$(,)? }) => {
+		match $queue.pop_front().unwrap() {
+			$(Request::$req_variant(id, params) => {
+				let msg = $handler(id, params, &$self.documents);
+				$self.ipc.send(msg).unwrap();
+			})*
 		}
 	}
 }
@@ -113,28 +126,15 @@ impl<'a> Dispatcher<'a> {
 	}
 
 	fn process_queue(self) {
-		use Request::*;
-
 		let mut queue = self.queue.lock();
 		while !queue.is_empty() {
-			match queue.pop_front().unwrap() {
-				Hover(id, params) => {
-					let msg = hover::handle(id, params, &self.documents);
-					self.ipc.send(msg).unwrap();
-				}
-				SemanticTokens(id, params) => {
-					let msg = semantic_tokens::handle(id, params, &self.documents);
-					self.ipc.send(msg).unwrap();
-				}
-				DocumentSymbols(id, params) => {
-					let msg = docsym::handle(id, params, &self.documents);
-					self.ipc.send(msg).unwrap();
-				}
-				GotoDefinition(id, params) => {
-					let msg = definition::handle(id, params, &self.documents);
-					self.ipc.send(msg).unwrap();
-				}
-			}
+			handle!(self, queue, {
+				Hover => hover::handle,
+				SemanticTokens => semantic_tokens::handle,
+				DocumentSymbols => docsym::handle,
+				GotoDefinition => definition::handle,
+				DebugAst => debug_ast::handle,
+			})
 		}
 	}
 }
@@ -180,6 +180,7 @@ impl TryFrom<LSPRequest> for Request {
 			SemanticTokensFullRequest => SemanticTokens,
 			DocumentSymbolRequest => DocumentSymbols,
 			GotoDefinition => GotoDefinition,
+			DebugAst => DebugAst,
 		})
 	}
 }

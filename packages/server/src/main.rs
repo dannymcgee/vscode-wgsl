@@ -9,6 +9,7 @@ extern crate lazy_static;
 extern crate serde;
 
 mod capabilities;
+mod debug_ast;
 mod definition;
 mod diagnostics;
 mod dispatcher;

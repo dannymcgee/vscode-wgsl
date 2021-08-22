@@ -10,14 +10,12 @@ pub struct AttributeList<'a> {
 	pub open_brace: Token<'a>,
 	pub attributes: Vec<Attribute<'a>>,
 	pub close_brace: Token<'a>,
-	pub span: Span,
 }
 
 #[derive(Clone, DebugLisp)]
 pub struct Attribute<'a> {
 	pub name: Token<'a>,
 	pub value: Option<Token<'a>>,
-	pub span: Span,
 }
 
 #[derive(Clone, DebugLisp)]
@@ -35,6 +33,12 @@ pub struct ArgumentList<'a> {
 	pub brace_open: Token<'a>,
 	pub arguments: Vec<Expr<'a>>,
 	pub brace_close: Token<'a>,
+}
+
+impl<'a> Spanned for AttributeList<'a> {
+	fn span(&self) -> Span {
+		self.open_brace.span().through(self.close_brace.span())
+	}
 }
 
 impl<'a> Parse<'a> for AttributeList<'a> {
@@ -73,8 +77,17 @@ impl<'a> Parse<'a> for AttributeList<'a> {
 			open_brace,
 			attributes,
 			close_brace,
-			span: open_brace.span().through(close_brace.span()),
 		})
+	}
+}
+
+impl<'a> Spanned for Attribute<'a> {
+	fn span(&self) -> Span {
+		if let Some(value) = self.value {
+			self.name.span().through(value.span())
+		} else {
+			self.name.span()
+		}
 	}
 }
 
@@ -98,13 +111,7 @@ impl<'a> Parse<'a> for Attribute<'a> {
 			None
 		};
 
-		let span = if let Some(value) = value {
-			name.span().through(value.span())
-		} else {
-			name.span()
-		};
-
-		Ok(Self { name, value, span })
+		Ok(Self { name, value })
 	}
 }
 
@@ -163,7 +170,7 @@ impl<'a> Spanned for TypeDecl<'a> {
 		let first = self
 			.annotator
 			.map(|token| token.span())
-			.or_else(|| self.attributes.as_ref().map(|attr| attr.span))
+			.or_else(|| self.attributes.as_ref().map(|attr| attr.span()))
 			.unwrap_or_else(|| self.name.span());
 
 		let last = self
