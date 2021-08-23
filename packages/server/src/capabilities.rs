@@ -26,6 +26,7 @@ pub fn define() -> json::Value {
 		text_document_sync: Some(TextDocumentSyncCapability::Kind(
 			TextDocumentSyncKind::Incremental,
 		)),
+		references_provider: Some(OneOf::Left(true)),
 		..Default::default()
 	})
 	.unwrap()

@@ -87,7 +87,7 @@ fn fs_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
         if (i >= min(u_globals.num_lights.x, c_max_lights)) {
             break;
         }
-        let light = s_lights.data[i];
+        let light: Light = s_lights.data[i];
         // project into the light space
         let shadow = fetch_shadow(i, light.proj * in.world_position);
         // compute Lambertian diffuse term

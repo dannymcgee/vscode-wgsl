@@ -13,11 +13,12 @@ use lsp_types::{
 		DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, Notification as _,
 	},
 	request::{
-		DocumentSymbolRequest, GotoDefinition, HoverRequest, Request as _,
+		DocumentSymbolRequest, GotoDefinition, HoverRequest, References, Request as _,
 		SemanticTokensFullRequest,
 	},
 	DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-	DocumentSymbolParams, GotoDefinitionParams, HoverParams, SemanticTokensParams, Url,
+	DocumentSymbolParams, GotoDefinitionParams, HoverParams, ReferenceParams, SemanticTokensParams,
+	Url,
 };
 use parking_lot::Mutex;
 
@@ -25,7 +26,7 @@ use crate::{
 	debug_ast, debug_tokens, definition, docsym,
 	documents_v2::{Documents, Status},
 	extensions::{DebugAst, DebugDocumentParams, DebugTokens},
-	hover, semantic_tokens,
+	hover, references, semantic_tokens,
 };
 
 enum Request {
@@ -35,6 +36,7 @@ enum Request {
 	GotoDefinition(RequestId, GotoDefinitionParams),
 	DebugAst(RequestId, DebugDocumentParams),
 	DebugTokens(RequestId, DebugDocumentParams),
+	References(RequestId, ReferenceParams),
 }
 
 enum DocEvent {
@@ -132,6 +134,7 @@ impl<'a> Dispatcher<'a> {
 				GotoDefinition => definition::handle,
 				DebugAst => debug_ast::handle,
 				DebugTokens => debug_tokens::handle,
+				References => references::handle,
 			})
 		}
 	}
@@ -180,6 +183,7 @@ impl TryFrom<LSPRequest> for Request {
 			GotoDefinition => GotoDefinition,
 			DebugAst => DebugAst,
 			DebugTokens => DebugTokens,
+			References => References,
 		})
 	}
 }

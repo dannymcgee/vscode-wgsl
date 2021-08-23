@@ -42,9 +42,8 @@ impl<'a> Spanned for SyntaxTree<'a> {
 	fn span(&self) -> Span {
 		self.inner
 			.first()
-			.unwrap()
-			.span()
-			.through(self.inner.last().unwrap().span())
+			.map(|first| first.span().through(self.inner.last().unwrap().span()))
+			.unwrap_or_else(|| span![0:0...0:0])
 	}
 }
 

@@ -205,9 +205,10 @@ impl<'a> Parse<'a> for PrimaryExpr<'a> {
 				Ok(Expr::Literal(token))
 			}
 			Some(Ident(_, _)) => {
-				let ident = input.parse::<IdentExpr>()?;
+				let mut ident = input.parse::<IdentExpr>()?;
 
 				if input.check(brace!["("]) {
+					ident.name = input.upgrade_last(TokenKind::Ident, Token::function)?;
 					let arguments = input.parse::<ArgumentList>()?;
 
 					Ok(Expr::FnCall(FnCallExpr { ident, arguments }))
@@ -247,7 +248,8 @@ impl<'a> Parse<'a> for FnCallExpr<'a> {
 	type Stream = ParseStream<'a>;
 
 	fn parse(input: &mut Self::Stream) -> Result<'a, Self> {
-		let ident = input.parse::<IdentExpr>()?;
+		let mut ident = input.parse::<IdentExpr>()?;
+		ident.name = input.upgrade_last(TokenKind::Ident, Token::function)?;
 		let arguments = input.parse::<ArgumentList>()?;
 
 		Ok(Self { ident, arguments })
@@ -299,9 +301,10 @@ impl<'a> Parse<'a> for IdentExpr<'a> {
 	type Stream = ParseStream<'a>;
 
 	fn parse(input: &mut Self::Stream) -> Result<'a, Self> {
-		let ident = input.consume_kind(TokenKind::Ident)?;
+		let mut ident = input.consume_kind(TokenKind::Ident)?;
 
 		if input.check(punct![::]) {
+			ident = input.upgrade_last(TokenKind::Ident, Token::module)?;
 			input.consume(punct![::])?;
 			let name = input.consume_kind(TokenKind::Ident)?;
 
@@ -327,7 +330,11 @@ impl<'a> Parse<'a> for PostfixExpr<'a> {
 		if input.check(punct![.]) {
 			let dot = input.next().unwrap();
 			let accessor = Accessor::Dot(dot);
-			let expr = Expr::Primary(input.parse()?);
+
+			let mut expr = input.parse::<PrimaryExpr>()?;
+			if let Expr::Ident(IdentExpr { name, .. }) = expr.expr.as_mut() {
+				*name = input.upgrade(*name, Token::field)?;
+			}
 
 			let postfix = match input.peek() {
 				Some(Punct(".", _) | Brace("[", _)) => {
@@ -338,7 +345,7 @@ impl<'a> Parse<'a> for PostfixExpr<'a> {
 
 			Ok(Self {
 				accessor,
-				expr: Box::new(expr),
+				expr: Box::new(Expr::Primary(expr)),
 				postfix,
 			})
 		} else {

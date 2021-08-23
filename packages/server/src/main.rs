@@ -4,8 +4,6 @@ use lsp_types::InitializeParams;
 use serde_json as json;
 
 #[macro_use]
-extern crate lazy_static;
-#[macro_use]
 extern crate serde;
 #[macro_use]
 extern crate gramatika;
@@ -21,6 +19,7 @@ mod documents;
 mod documents_v2;
 mod extensions;
 mod hover;
+mod references;
 mod semantic_tokens;
 
 type Error = Box<dyn std::error::Error + Send + Sync>;

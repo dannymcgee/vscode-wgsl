@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use gramatika::{Spanned, Token as _};
 use parser_v2::{
-	decl::Decl,
+	decl::{Decl, FieldDecl, StructDecl, VarDecl},
 	expr::{Expr, IdentExpr, PrimaryExpr},
 	scopes::Scope,
 	stmt::Stmt,
@@ -31,8 +31,6 @@ impl<'a> DeclFinder<'a> {
 		deps: HashMap<&'a str, &'a Document<'a>>,
 		needle: Token<'a>,
 	) -> Self {
-		eprintln!("Needle: {:?}", needle);
-
 		Self {
 			scope,
 			deps,
@@ -56,7 +54,65 @@ impl<'a> Visitor<'a> for DeclFinder<'a> {
 					decl,
 					parent: None,
 				});
+
+				FlowControl::Break
+			} else {
+				FlowControl::Continue
 			}
+		} else if decl.span().contains(self.needle.span()) {
+			FlowControl::Continue
+		} else {
+			FlowControl::Break
+		}
+	}
+
+	fn visit_var_decl(&mut self, decl: &'a VarDecl<'a>) -> FlowControl {
+		if decl.name.span() == self.needle.span() {
+			if let Some(decl) = self.scope.find_decl(self.needle) {
+				self.result = Some(FindDeclResult {
+					source_module: None,
+					decl,
+					parent: None,
+				});
+			}
+
+			FlowControl::Break
+		} else if decl.span().contains(self.needle.span()) {
+			FlowControl::Continue
+		} else {
+			FlowControl::Break
+		}
+	}
+
+	fn visit_struct_decl(&mut self, decl: &'a StructDecl<'a>) -> FlowControl {
+		for field in decl.body.fields.iter() {
+			if field.name().span() == self.needle.span() {
+				let parent = self.scope.find_decl(decl.name);
+				self.result = self
+					.scope
+					.find_field_decl(self.needle, decl.name)
+					.map(|decl| FindDeclResult {
+						source_module: None,
+						decl,
+						parent,
+					});
+
+				return FlowControl::Break;
+			} else if field.span().contains(self.needle.span()) {
+				return FlowControl::Continue;
+			}
+		}
+
+		FlowControl::Break
+	}
+
+	fn visit_field_decl(&mut self, decl: &'a FieldDecl<'a>) -> FlowControl {
+		if decl.name.span() == self.needle.span() {
+			self.result = Some(FindDeclResult {
+				source_module: None,
+				decl: Arc::new(Decl::Field(decl.clone())),
+				parent: None,
+			});
 
 			FlowControl::Break
 		} else if decl.span().contains(self.needle.span()) {
@@ -165,24 +221,18 @@ impl<'a> Visitor<'a> for DeclFinder<'a> {
 					});
 				}
 			}
-		}
-		// The struct is not namespaced, so we can just look up the local struct declaration
-		else if let Some(struct_decl) = self.scope.find_decl(struct_name.name) {
-			// Look up the matching field name
-			self.result = match struct_decl.as_ref() {
-				Decl::Struct(inner) => inner
-					.body
-					.fields
-					.iter()
-					.find(|decl| decl.name().lexeme() == field_name.lexeme()),
-				_ => None,
-			}
-			// Map to the final result
-			.map(|field_decl| FindDeclResult {
-				source_module: None,
-				decl: Arc::new(field_decl.clone()),
-				parent: Some(Arc::clone(&struct_decl)),
-			});
+		} else {
+			// The struct is local to this module, so we can look it up directly
+			let parent = self.scope.find_decl(struct_name.name);
+
+			self.result = self
+				.scope
+				.find_field_decl(field_name, struct_name.name)
+				.map(|decl| FindDeclResult {
+					source_module: None,
+					decl,
+					parent,
+				});
 		}
 
 		FlowControl::Break

@@ -4,7 +4,9 @@ use gramatika::{Position, Span, Spanned, Token as _};
 
 use super::Scope;
 use crate::{
-	decl::{Decl, FunctionDecl, ModuleDecl, ParamDecl, StructDecl, TypeAliasDecl, VarDecl},
+	decl::{
+		Decl, FieldDecl, FunctionDecl, ModuleDecl, ParamDecl, StructDecl, TypeAliasDecl, VarDecl,
+	},
 	stmt::{BlockStmt, CaseStmt, ContinuingStmt, ElseStmt, ForStmt, IfStmt, LoopStmt, Stmt},
 	traversal::{FlowControl, Visitor, Walk},
 	Token,
@@ -61,9 +63,12 @@ macro_rules! simple_decl {
 	($self:ident, $variant:ident($decl:ident)) => {{
 		let ident = $decl.name.lexeme();
 		let start = $decl.name.span().start;
+		let kind = $decl.name.kind();
 
 		$self.current = $self.spawn_for_decl(start);
-		$self.current.define(ident, Decl::$variant($decl.clone()));
+		$self
+			.current
+			.define((ident, kind), Decl::$variant($decl.clone()));
 	}};
 }
 
@@ -90,8 +95,34 @@ impl<'a> Visitor<'a> for ScopeBuilder<'a> {
 		FlowControl::Break
 	}
 
+	// --- Struct declaration -------------------------------------------------------------
+
 	fn visit_struct_decl(&mut self, decl: &'a StructDecl<'a>) -> FlowControl {
-		simple_decl!(self, Struct(decl));
+		let ident = decl.name.lexeme();
+		let start = decl.name.span().start;
+		let kind = decl.name.kind();
+
+		let starting_scope = self.spawn_for_decl(start);
+		self.current = Arc::clone(&starting_scope);
+		self.current
+			.define((ident, kind), Decl::Struct(decl.clone()));
+
+		for field in decl.body.fields.iter() {
+			field.walk(self);
+		}
+
+		while self.current.span != starting_scope.span {
+			self.pop_scope();
+		}
+
+		FlowControl::Break
+	}
+
+	fn visit_field_decl(&mut self, decl: &'a FieldDecl<'a>) -> FlowControl {
+		let ident = decl.name.lexeme();
+		let kind = decl.name.kind();
+		self.current
+			.define((ident, kind), Decl::Field(decl.clone()));
 
 		FlowControl::Break
 	}
@@ -103,10 +134,12 @@ impl<'a> Visitor<'a> for ScopeBuilder<'a> {
 		// and add the function declaration to it
 		let ident = decl.name.lexeme();
 		let start = decl.name.span().start;
+		let kind = decl.name.kind();
 
 		let starting_scope = self.spawn_for_decl(start);
 		self.current = Arc::clone(&starting_scope);
-		self.current.define(ident, Decl::Function(decl.clone()));
+		self.current
+			.define((ident, kind), Decl::Function(decl.clone()));
 
 		// Create a narrower scope enclosing just the function body
 		let end = decl.body.brace_close.span().start;
@@ -131,7 +164,9 @@ impl<'a> Visitor<'a> for ScopeBuilder<'a> {
 
 	fn visit_param_decl(&mut self, decl: &'a ParamDecl<'a>) -> FlowControl {
 		let ident = decl.name.lexeme();
-		self.current.define(ident, Decl::Param(decl.clone()));
+		let kind = decl.name.kind();
+		self.current
+			.define((ident, kind), Decl::Param(decl.clone()));
 
 		FlowControl::Break
 	}

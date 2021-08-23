@@ -89,7 +89,7 @@ fn limited_postfix_expr() {
 			accessor: (Accessor::Dot `.` (Punct (1:6...1:7))),
 			expr: (Expr::Primary (PrimaryExpr
 				expr: (Expr::Ident (IdentExpr
-					name: `color` (Ident (1:7...1:12)),
+					name: `color` (Field (1:7...1:12)),
 				)),
 			)),
 		),

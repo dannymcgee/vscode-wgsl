@@ -404,7 +404,7 @@ impl<'a> Parse<'a> for FunctionDecl<'a> {
 		} else {
 			None
 		};
-		let name = input.consume_kind(TokenKind::Ident)?;
+		let name = input.consume_as(TokenKind::Ident, Token::function)?;
 		input.consume(brace!["("])?;
 
 		let mut params = vec![];

@@ -51,7 +51,7 @@ fn ident_expr() {
 		let found = format!("{:#?}", node);
 		let expected = r#"
 (SyntaxNode::Expr (Expr::Ident (IdentExpr
-	name: `model_matrix_1` (Ident (43:12...43:26)),
+	name: `model_matrix_1` (Field (43:12...43:26)),
 )))
 		"#;
 		let expected = expected.trim().replace('\t', "  ");
@@ -80,7 +80,7 @@ fn binary_expr() {
 			accessor: (Accessor::Dot `.` (Punct (78:27...78:28))),
 			expr: (Expr::Primary (PrimaryExpr
 				expr: (Expr::Ident (IdentExpr
-					name: `color` (Ident (78:28...78:33)),
+					name: `color` (Field (78:28...78:33)),
 				)),
 			)),
 		),
