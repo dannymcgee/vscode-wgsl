@@ -1,10 +1,10 @@
 import { commands } from "vscode";
 
 import ctx from "../context";
-export * from "./debug-ast";
+
+export * from "./debug-document";
 
 interface CommandHandler {
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	(...args: any[]): any;
 }
 

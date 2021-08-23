@@ -1,7 +1,7 @@
 import { workspace } from "vscode";
 import ctx from "../context";
 
-export * from "./debug-ast";
+export * from "./debug-document";
 
 namespace providers {
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any

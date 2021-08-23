@@ -22,22 +22,19 @@ use lsp_types::{
 use parking_lot::Mutex;
 
 use crate::{
-	debug_ast, definition, docsym,
+	debug_ast, debug_tokens, definition, docsym,
 	documents_v2::{Documents, Status},
-	extensions::{DebugAst, DebugAstParams},
+	extensions::{DebugAst, DebugDocumentParams, DebugTokens},
 	hover, semantic_tokens,
 };
-
-lazy_static! {
-	static ref QUEUE: Arc<Mutex<VecDeque<Request>>> = Arc::new(Mutex::new(VecDeque::new()));
-}
 
 enum Request {
 	Hover(RequestId, HoverParams),
 	SemanticTokens(RequestId, SemanticTokensParams),
 	DocumentSymbols(RequestId, DocumentSymbolParams),
 	GotoDefinition(RequestId, GotoDefinitionParams),
-	DebugAst(RequestId, DebugAstParams),
+	DebugAst(RequestId, DebugDocumentParams),
+	DebugTokens(RequestId, DebugDocumentParams),
 }
 
 enum DocEvent {
@@ -134,6 +131,7 @@ impl<'a> Dispatcher<'a> {
 				DocumentSymbols => docsym::handle,
 				GotoDefinition => definition::handle,
 				DebugAst => debug_ast::handle,
+				DebugTokens => debug_tokens::handle,
 			})
 		}
 	}
@@ -181,6 +179,7 @@ impl TryFrom<LSPRequest> for Request {
 			DocumentSymbolRequest => DocumentSymbols,
 			GotoDefinition => GotoDefinition,
 			DebugAst => DebugAst,
+			DebugTokens => DebugTokens,
 		})
 	}
 }

@@ -10,10 +10,11 @@ import {
 } from "vscode";
 
 import ctx from "../context";
-import ext, { DebugAstParams } from "../extensions";
+import ext, { DebugDocumentParams } from "../extensions";
+import { sleep } from "../util";
 
-export class DebugAstDocument implements TextDocumentContentProvider {
-	readonly uri = Uri.parse("wgsl://debug/syntax-tree.wgsl-ast");
+export abstract class DebugDocumentProvider implements TextDocumentContentProvider {
+	readonly uri: Uri;
 	readonly emitter = new EventEmitter<Uri>();
 
 	// prettier-ignore
@@ -47,18 +48,33 @@ export class DebugAstDocument implements TextDocumentContentProvider {
 			return "";
 		}
 
-		let params: DebugAstParams = {
+		let params: DebugDocumentParams = {
 			textDocument: {
 				uri: editor.document.uri.toString(),
 			},
 		};
 
+		return this.sendRequest(params, onCancel);
+	}
+
+	abstract sendRequest(
+		params: DebugDocumentParams,
+		onCancel: CancellationToken
+	): Promise<string>;
+}
+
+export class DebugAstProvider extends DebugDocumentProvider {
+	readonly uri = Uri.parse("wgsl-ast://debug/syntax-tree.wgsl-ast");
+
+	async sendRequest(params: DebugDocumentParams, onCancel: CancellationToken) {
 		return ctx.get()?.client.sendRequest(ext.DEBUG_AST, params, onCancel) ?? "";
 	}
 }
 
-function sleep(ms: number) {
-	return new Promise<void>(resolve => {
-		setTimeout(resolve, ms);
-	});
+export class DebugTokensProvider extends DebugDocumentProvider {
+	readonly uri = Uri.parse("wgsl-tokens://debug/document-tokens.wgsl-ast");
+
+	async sendRequest(params: DebugDocumentParams, onCancel: CancellationToken) {
+		return ctx.get()?.client.sendRequest(ext.DEBUG_TOKENS, params, onCancel) ?? "";
+	}
 }

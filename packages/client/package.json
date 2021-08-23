@@ -51,6 +51,11 @@
 				"command": "wgsl.debugAst",
 				"title": "(debug) Show Syntax Tree",
 				"category": "WGSL"
+			},
+			{
+				"command": "wgsl.debugTokens",
+				"title": "(debug) Show Document Tokens",
+				"category": "WGSL"
 			}
 		]
 	},

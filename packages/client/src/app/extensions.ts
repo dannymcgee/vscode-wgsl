@@ -9,7 +9,7 @@ export interface UnreadDependencyParams {
 	dependant: string;
 }
 
-export interface DebugAstParams {
+export interface DebugDocumentParams {
 	textDocument: TextDocumentIdentifier;
 }
 
@@ -19,7 +19,9 @@ namespace ext {
 	export const UNREAD_DEPENDENCY =
 		new NotificationType<UnreadDependencyParams>("wgsl/unreadDependency");
 	export const DEBUG_AST =
-		new RequestType<DebugAstParams, string, void>("wgsl/debugAst");
+		new RequestType<DebugDocumentParams, string, void>("wgsl/debugAst");
+	export const DEBUG_TOKENS =
+		new RequestType<DebugDocumentParams, string, void>("wgsl/debugTokens");
 }
 
 export default ext;

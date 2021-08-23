@@ -7,9 +7,12 @@ use serde_json as json;
 extern crate lazy_static;
 #[macro_use]
 extern crate serde;
+#[macro_use]
+extern crate gramatika;
 
 mod capabilities;
 mod debug_ast;
+mod debug_tokens;
 mod definition;
 mod diagnostics;
 mod dispatcher;

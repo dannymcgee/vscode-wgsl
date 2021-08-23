@@ -15,13 +15,20 @@ impl Notification for UnreadDependency {
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct DebugAstParams {
+pub struct DebugDocumentParams {
 	pub text_document: TextDocumentIdentifier,
 }
 
 pub enum DebugAst {}
 impl Request for DebugAst {
-	type Params = DebugAstParams;
+	type Params = DebugDocumentParams;
 	type Result = String;
 	const METHOD: &'static str = "wgsl/debugAst";
+}
+
+pub enum DebugTokens {}
+impl Request for DebugTokens {
+	type Params = DebugDocumentParams;
+	type Result = String;
+	const METHOD: &'static str = "wgsl/debugTokens";
 }
