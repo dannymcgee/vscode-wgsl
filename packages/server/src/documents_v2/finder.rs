@@ -157,7 +157,9 @@ impl<'a> Visitor<'a> for DeclFinder<'a> {
 			.as_ref()
 			// If the postfix contains the needle, then the needle is our field name
 			.and_then(|postfix| {
-				if postfix.span().contains(self.needle.span()) {
+				if postfix.span().contains(self.needle.span())
+					&& postfix.expr.span().start == self.needle.span().start
+				{
 					Some(self.needle)
 				} else {
 					None
