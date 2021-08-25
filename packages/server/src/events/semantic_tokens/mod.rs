@@ -70,7 +70,7 @@ fn get_semantic_tokens(uri: Url, docs: &Documents) -> SemanticTokens {
 				delta_start: delta.delta_start_char,
 				length: token.lexeme().len() as u32,
 				token_type: (*ttype) as u32,
-				token_modifiers_bitset: *tmod,
+				token_modifiers_bitset: tmod.bits(),
 			}
 		})
 		.collect_vec();

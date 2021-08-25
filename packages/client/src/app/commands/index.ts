@@ -2,6 +2,7 @@ import { commands } from "vscode";
 
 import ctx from "../context";
 
+export * from "./code-lens";
 export * from "./debug-document";
 
 interface CommandHandler {

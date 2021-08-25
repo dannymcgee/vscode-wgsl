@@ -56,6 +56,12 @@
 				"command": "wgsl.debugTokens",
 				"title": "(debug) Show Document Tokens",
 				"category": "WGSL"
+			},
+			{
+				"command": "wgsl.resolveLensReferences",
+				"title": "Resolve CodeLens References",
+				"enablement": "false",
+				"category": "WGSL"
 			}
 		]
 	},

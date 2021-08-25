@@ -21,13 +21,9 @@ use wgsl_plus::ResolveImportPath;
 mod document;
 mod finder;
 
-use crate::extensions::{UnreadDependency, UnreadDependencyParams};
+use crate::lsp_extensions::{UnreadDependency, UnreadDependencyParams};
 pub use document::Document;
 use finder::{DeclFinder, FindDeclResult};
-
-lazy_static! {
-	static ref DOCS: Arc<DashMap<Url, SyntaxTree<'static>>> = Arc::new(DashMap::new());
-}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Status {

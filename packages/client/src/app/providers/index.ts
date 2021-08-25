@@ -1,17 +1,19 @@
-import { workspace } from "vscode";
+import { languages } from "vscode";
 import ctx from "../context";
+import { Ctor } from "../util";
 
-export * from "./debug-document";
+export * from "./references";
 
 namespace providers {
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	export function register(id: string, ...args: any[]) {
-		let registerProvider = workspace[`register${id}Provider`];
+	export function register(id: string, Provider: Ctor<any>) {
+		let registerProvider = languages[`register${id}Provider`];
+		let selector = { language: "wgsl", scheme: "file" };
+
 		if (typeof registerProvider !== "function") {
-			throw new Error(`workspace.register${id}Provider is not a function!`);
+			throw new Error(`languages.register${id}Provider is not a function!`);
 		}
 
-		ctx.get()?.subscriptions.push(registerProvider(...args));
+		ctx.get()?.subscriptions.push(registerProvider(selector, new Provider()));
 	}
 }
 

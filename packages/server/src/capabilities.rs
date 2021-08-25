@@ -1,11 +1,11 @@
 use lsp_types::{
-	DocumentSymbolOptions, HoverProviderCapability, OneOf, SemanticTokensFullOptions,
-	SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities,
-	TextDocumentSyncCapability, TextDocumentSyncKind, WorkDoneProgressOptions,
+	CodeLensOptions, DocumentSymbolOptions, HoverProviderCapability, OneOf,
+	SemanticTokensFullOptions, SemanticTokensOptions, SemanticTokensServerCapabilities,
+	ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, WorkDoneProgressOptions,
 };
 use serde_json as json;
 
-use crate::semantic_tokens;
+use crate::events::semantic_tokens;
 
 pub fn define() -> json::Value {
 	json::to_value(&ServerCapabilities {
@@ -27,6 +27,9 @@ pub fn define() -> json::Value {
 			TextDocumentSyncKind::Incremental,
 		)),
 		references_provider: Some(OneOf::Left(true)),
+		code_lens_provider: Some(CodeLensOptions {
+			resolve_provider: Some(false),
+		}),
 		..Default::default()
 	})
 	.unwrap()

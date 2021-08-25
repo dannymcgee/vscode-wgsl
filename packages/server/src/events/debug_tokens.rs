@@ -2,7 +2,7 @@ use lsp_server::{Message, RequestId, Response};
 use parser_v2::Token;
 use serde_json as json;
 
-use crate::{documents_v2::Documents, extensions::DebugDocumentParams};
+use crate::{documents_v2::Documents, lsp_extensions::DebugDocumentParams};
 
 #[derive(DebugLisp)]
 struct TokensPrinter<'a> {

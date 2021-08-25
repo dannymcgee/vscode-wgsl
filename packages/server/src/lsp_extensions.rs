@@ -13,7 +13,7 @@ impl Notification for UnreadDependency {
 	const METHOD: &'static str = "wgsl/unreadDependency";
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DebugDocumentParams {
 	pub text_document: TextDocumentIdentifier,

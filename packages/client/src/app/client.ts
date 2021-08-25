@@ -6,6 +6,7 @@ import {
 	TransportKind,
 } from "vscode-languageclient/node";
 
+import { capabilities } from "./capabilities";
 import ext from "./extensions";
 
 namespace client {
@@ -33,7 +34,9 @@ namespace client {
 				await workspace.openTextDocument(dependency);
 			});
 
-			client.sendRequest(new ProtocolRequestType("initialize"), {});
+			client.sendRequest(new ProtocolRequestType("initialize"), {
+				capabilities,
+			});
 		});
 
 		return client;

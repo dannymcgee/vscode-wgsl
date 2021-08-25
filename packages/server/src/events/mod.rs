@@ -13,21 +13,28 @@ use lsp_types::{
 		DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, Notification as _,
 	},
 	request::{
-		DocumentSymbolRequest, GotoDefinition, HoverRequest, References, Request as _,
-		SemanticTokensFullRequest,
+		CodeLensRequest, DocumentSymbolRequest, GotoDefinition, HoverRequest, References,
+		Request as _, SemanticTokensFullRequest,
 	},
-	DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-	DocumentSymbolParams, GotoDefinitionParams, HoverParams, ReferenceParams, SemanticTokensParams,
-	Url,
+	CodeLensParams, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
+	DidOpenTextDocumentParams, DocumentSymbolParams, GotoDefinitionParams, HoverParams,
+	ReferenceParams, SemanticTokensParams, Url,
 };
 use parking_lot::Mutex;
 
 use crate::{
-	debug_ast, debug_tokens, definition, docsym,
 	documents_v2::{Documents, Status},
-	extensions::{DebugAst, DebugDocumentParams, DebugTokens},
-	hover, references, semantic_tokens,
+	lsp_extensions::{DebugAst, DebugDocumentParams, DebugTokens},
 };
+
+mod code_lens;
+mod debug_ast;
+mod debug_tokens;
+mod definition;
+mod document_symbols;
+mod hover;
+mod references;
+pub mod semantic_tokens;
 
 enum Request {
 	Hover(RequestId, HoverParams),
@@ -37,6 +44,7 @@ enum Request {
 	DebugAst(RequestId, DebugDocumentParams),
 	DebugTokens(RequestId, DebugDocumentParams),
 	References(RequestId, ReferenceParams),
+	CodeLens(RequestId, CodeLensParams),
 }
 
 enum DocEvent {
@@ -64,7 +72,7 @@ impl<'a> Clone for Dispatcher<'a> {
 	}
 }
 
-macro_rules! handle {
+macro_rules! next {
 	($self:ident, $queue:ident, { $($req_variant:ident => $handler:path),*$(,)? }) => {
 		match $queue.pop_front().unwrap() {
 			$(Request::$req_variant(id, params) => {
@@ -127,20 +135,21 @@ impl<'a> Dispatcher<'a> {
 	fn process_queue(self) {
 		let mut queue = self.queue.lock();
 		while !queue.is_empty() {
-			handle!(self, queue, {
+			next!(self, queue, {
 				Hover => hover::handle,
 				SemanticTokens => semantic_tokens::handle,
-				DocumentSymbols => docsym::handle,
+				DocumentSymbols => document_symbols::handle,
 				GotoDefinition => definition::handle,
 				DebugAst => debug_ast::handle,
 				DebugTokens => debug_tokens::handle,
 				References => references::handle,
+				CodeLens => code_lens::handle,
 			})
 		}
 	}
 }
 
-macro_rules! request {
+macro_rules! from_request {
 	($request:ident, { $($msg_type:ident => $variant:ident),*$(,)? }) => {
 		match &$request.method[..] {
 			$($msg_type::METHOD => {
@@ -154,7 +163,7 @@ macro_rules! request {
 	}
 }
 
-macro_rules! doc_event {
+macro_rules! from_doc_event {
 	($notification:ident, { $($msg_type:ident => $variant:ident),*$(,)? }) => {
 		match &$notification.method[..] {
 			$($msg_type::METHOD => {
@@ -176,7 +185,7 @@ impl TryFrom<LSPRequest> for Request {
 	type Error = DispatchError;
 
 	fn try_from(value: LSPRequest) -> Result<Self, Self::Error> {
-		request!(value, {
+		from_request!(value, {
 			HoverRequest => Hover,
 			SemanticTokensFullRequest => SemanticTokens,
 			DocumentSymbolRequest => DocumentSymbols,
@@ -184,6 +193,7 @@ impl TryFrom<LSPRequest> for Request {
 			DebugAst => DebugAst,
 			DebugTokens => DebugTokens,
 			References => References,
+			CodeLensRequest => CodeLens,
 		})
 	}
 }
@@ -192,7 +202,7 @@ impl TryFrom<Notification> for DocEvent {
 	type Error = DispatchError;
 
 	fn try_from(value: Notification) -> Result<Self, Self::Error> {
-		doc_event!(value, {
+		from_doc_event!(value, {
 			DidOpenTextDocument => Open,
 			DidChangeTextDocument => Change,
 			DidCloseTextDocument => Close,

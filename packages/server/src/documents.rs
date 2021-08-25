@@ -19,7 +19,7 @@ use wgsl_plus::{GetExports, ResolveDeps, ResolveImportPath};
 
 use crate::{
 	diagnostics::{self, ErrorKind},
-	extensions::{UnreadDependency, UnreadDependencyParams},
+	lsp_extensions::{UnreadDependency, UnreadDependencyParams},
 };
 
 // TODO - This module desperately needs a refactor

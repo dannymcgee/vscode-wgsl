@@ -4,7 +4,7 @@ import {
 	DebugAstProvider,
 	DebugDocumentProvider,
 	DebugTokensProvider,
-} from "../providers";
+} from "../contentProviders";
 import { Ctor } from "../util";
 
 async function debugDocument(Provider: Ctor<DebugDocumentProvider>) {

@@ -1,4 +1,3 @@
-use dispatcher::Dispatcher;
 use lsp_server::{Connection, Message};
 use lsp_types::InitializeParams;
 use serde_json as json;
@@ -9,18 +8,11 @@ extern crate serde;
 extern crate gramatika;
 
 mod capabilities;
-mod debug_ast;
-mod debug_tokens;
-mod definition;
 mod diagnostics;
-mod dispatcher;
-mod docsym;
 mod documents;
 mod documents_v2;
-mod extensions;
-mod hover;
-mod references;
-mod semantic_tokens;
+mod events;
+mod lsp_extensions;
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 
@@ -45,7 +37,7 @@ fn main_loop(cx: &Connection, params: json::Value) -> anyhow::Result<()> {
 	let rx = cx.receiver.clone();
 	let tx = cx.sender.clone();
 
-	let dispatcher = Dispatcher::new(tx);
+	let dispatcher = events::Dispatcher::new(tx);
 
 	for msg in rx {
 		match msg {

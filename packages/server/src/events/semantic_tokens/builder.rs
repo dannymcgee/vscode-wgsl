@@ -16,7 +16,7 @@ use crate::documents_v2::Document;
 pub struct SemanticTokensBuilder<'a> {
 	scopes: Arc<Scope<'a>>,
 	deps: HashMap<&'a str, &'a Document<'a>>,
-	result: HashMap<Token<'a>, (TokenType, u32)>,
+	result: HashMap<Token<'a>, (TokenType, TokenMod)>,
 }
 
 impl<'a> SemanticTokensBuilder<'a> {
@@ -28,26 +28,24 @@ impl<'a> SemanticTokensBuilder<'a> {
 		}
 	}
 
-	pub fn build(self) -> HashMap<Token<'a>, (TokenType, u32)> {
+	pub fn build(self) -> HashMap<Token<'a>, (TokenType, TokenMod)> {
 		self.result
 	}
 }
 
 impl<'a> Visitor<'a> for SemanticTokensBuilder<'a> {
 	fn visit_decl(&mut self, decl: &'a Decl<'a>) -> FlowControl {
-		let (ttype, mut tmod): (TokenType, u32) = match decl {
-			Decl::Var(_) => (TokenType::Variable, 0),
-			Decl::Const(_) => (TokenType::Variable, TokenMod::Readonly as _),
-			Decl::TypeAlias(_) => (TokenType::Type, 0),
-			Decl::Struct(_) => (TokenType::Struct, 0),
-			Decl::Field(_) => (TokenType::Property, 0),
-			Decl::Function(_) => (TokenType::Function, 0),
-			Decl::Param(_) => (TokenType::Parameter, 0),
-			Decl::Extension(_) => (TokenType::Namespace, 0),
-			Decl::Module(_) => (TokenType::Namespace, 0),
+		let (ttype, tmod): (TokenType, TokenMod) = match decl {
+			Decl::Var(_) => (TokenType::Variable, TokenMod::DECL),
+			Decl::Const(_) => (TokenType::Variable, TokenMod::DECL | TokenMod::READONLY),
+			Decl::TypeAlias(_) => (TokenType::Type, TokenMod::DECL),
+			Decl::Struct(_) => (TokenType::Struct, TokenMod::DECL),
+			Decl::Field(_) => (TokenType::Property, TokenMod::DECL),
+			Decl::Function(_) => (TokenType::Function, TokenMod::DECL),
+			Decl::Param(_) => (TokenType::Parameter, TokenMod::DECL),
+			Decl::Extension(_) => (TokenType::Namespace, TokenMod::DECL),
+			Decl::Module(_) => (TokenType::Namespace, TokenMod::DECL),
 		};
-		tmod |= TokenMod::Decl as u32;
-
 		self.result.insert(decl.name(), (ttype, tmod));
 
 		FlowControl::Continue
@@ -60,9 +58,9 @@ impl<'a> Visitor<'a> for SemanticTokensBuilder<'a> {
 		// generic types).
 		if let Some(token) = decl.child_ty {
 			self.result
-				.insert(decl.name.name, (TokenType::Struct, TokenMod::Builtin as _));
+				.insert(decl.name.name, (TokenType::Struct, TokenMod::BUILTIN));
 			self.result
-				.insert(token, (TokenType::Type, TokenMod::Builtin as _));
+				.insert(token, (TokenType::Type, TokenMod::BUILTIN));
 
 			// Avoid trying to re-visit the ident expression
 			FlowControl::Break
@@ -82,8 +80,8 @@ impl<'a> Visitor<'a> for SemanticTokensBuilder<'a> {
 		// Without the `Decl` enum wrapper, we need to check the storage keyword to
 		// determine the mutability modifier.
 		let tmod = match decl.storage.lexeme() {
-			"let" => TokenMod::Decl as u32 | TokenMod::Readonly as u32,
-			"var" => TokenMod::Decl as u32,
+			"let" => TokenMod::DECL | TokenMod::READONLY,
+			"var" => TokenMod::DECL,
 			_ => unreachable!(),
 		};
 		self.result.insert(decl.name, (TokenType::Variable, tmod));
@@ -98,7 +96,7 @@ impl<'a> Visitor<'a> for SemanticTokensBuilder<'a> {
 			// If `visit_ident_expr` didn't register a token for this, it means it couldn't
 			// find a declaration in scope for the identifier -- that means it's either
 			// invalid or a built-in function, so we'll assume the latter.
-			.or_insert((TokenType::Function, TokenMod::Builtin as u32));
+			.or_insert((TokenType::Function, TokenMod::BUILTIN));
 
 		// We break here to avoid re-visiting the ident, so walk the arguments manually.
 		for arg in expr.arguments.arguments.iter() {
@@ -120,7 +118,8 @@ impl<'a> Visitor<'a> for SemanticTokensBuilder<'a> {
 		// registering it here instead.
 		if let Expr::Primary(ref inner) = expr.expr.as_ref() {
 			if let Expr::Ident(ref inner) = inner.expr.as_ref() {
-				self.result.insert(inner.name, (TokenType::Property, 0));
+				self.result
+					.insert(inner.name, (TokenType::Property, TokenMod::NONE));
 			}
 		}
 
@@ -137,7 +136,8 @@ impl<'a> Visitor<'a> for SemanticTokensBuilder<'a> {
 		// If it's a namespaced identifier, we need to look up the declaration in the
 		// dependency's source document.
 		if let Some(ref namespace) = expr.namespace {
-			self.result.insert(*namespace, (TokenType::Namespace, 0));
+			self.result
+				.insert(*namespace, (TokenType::Namespace, TokenMod::NONE));
 
 			let name = expr.name;
 			if let Some(document) = self.deps.get(namespace.lexeme()) {
@@ -155,7 +155,7 @@ impl<'a> Visitor<'a> for SemanticTokensBuilder<'a> {
 						_ => unreachable!(),
 					};
 
-					self.result.insert(name, (ttype, 0));
+					self.result.insert(name, (ttype, TokenMod::NONE));
 				}
 			}
 		}
@@ -165,15 +165,15 @@ impl<'a> Visitor<'a> for SemanticTokensBuilder<'a> {
 				.scopes
 				.find_decl(token)
 				.map(|decl| match decl.as_ref() {
-					Decl::Struct(_) => (TokenType::Struct, 0),
-					Decl::TypeAlias(_) => (TokenType::Type, 0),
-					Decl::Function(_) => (TokenType::Function, 0),
-					Decl::Var(_) => (TokenType::Variable, 0),
-					Decl::Const(_) => (TokenType::Variable, TokenMod::Readonly as u32),
+					Decl::Struct(_) => (TokenType::Struct, TokenMod::NONE),
+					Decl::TypeAlias(_) => (TokenType::Type, TokenMod::NONE),
+					Decl::Function(_) => (TokenType::Function, TokenMod::NONE),
+					Decl::Var(_) => (TokenType::Variable, TokenMod::NONE),
+					Decl::Const(_) => (TokenType::Variable, TokenMod::READONLY),
 					Decl::Field(_) => unreachable!(),
-					Decl::Param(_) => (TokenType::Parameter, 0),
-					Decl::Extension(_) => (TokenType::Namespace, 0),
-					Decl::Module(_) => (TokenType::Namespace, 0),
+					Decl::Param(_) => (TokenType::Parameter, TokenMod::NONE),
+					Decl::Extension(_) => (TokenType::Namespace, TokenMod::NONE),
+					Decl::Module(_) => (TokenType::Namespace, TokenMod::NONE),
 				});
 
 			if let Some((ttype, tmod)) = sem_tok {
@@ -184,10 +184,10 @@ impl<'a> Visitor<'a> for SemanticTokensBuilder<'a> {
 		// `Type` token right now. See the TODO note in `parser_v2::tokens`.
 		else {
 			let sem_tok = match expr.name {
-				Token::Type(_, _) => Some((TokenType::Type, TokenMod::Builtin as u32)),
-				Token::Attribute(_, _) => Some((TokenType::Macro, 0)),
-				Token::Function(_, _) => Some((TokenType::Function, TokenMod::Builtin as u32)),
-				Token::Field(_, _) => Some((TokenType::Property, 0)),
+				Token::Type(_, _) => Some((TokenType::Type, TokenMod::BUILTIN)),
+				Token::Attribute(_, _) => Some((TokenType::Macro, TokenMod::NONE)),
+				Token::Function(_, _) => Some((TokenType::Function, TokenMod::BUILTIN)),
+				Token::Field(_, _) => Some((TokenType::Property, TokenMod::NONE)),
 				_ => None,
 			};
 

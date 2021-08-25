@@ -2,8 +2,11 @@ import { ExtensionContext } from "vscode";
 
 import ctx from "./context";
 import client from "./client";
-import cmd, { debugAst, debugTokens } from "./commands";
-import providers, { DebugAstProvider, DebugTokensProvider } from "./providers";
+import cmd, { debugAst, debugTokens, resolveLensReferences } from "./commands";
+import contentProviders, {
+	DebugAstProvider,
+	DebugTokensProvider,
+} from "./contentProviders";
 
 // prettier-ignore
 export function activate(context: ExtensionContext) {
@@ -11,11 +14,12 @@ export function activate(context: ExtensionContext) {
 
 	ctx.bootstrap(context, client.create());
 
-	providers.register("TextDocumentContent", "wgsl-ast", new DebugAstProvider());
-	providers.register("TextDocumentContent", "wgsl-tokens", new DebugTokensProvider());
+	contentProviders.register("wgsl-ast", DebugAstProvider);
+	contentProviders.register("wgsl-tokens", DebugTokensProvider);
 
 	cmd.register("debugAst", debugAst);
 	cmd.register("debugTokens", debugTokens);
+	cmd.register("resolveLensReferences", resolveLensReferences);
 }
 
 export function deactivate() {

@@ -111,6 +111,20 @@ impl<'a> Decl<'a> {
 			Decl::Module(decl) => decl.name,
 		}
 	}
+
+	pub fn attributes(&self) -> Option<&AttributeList<'a>> {
+		match self {
+			Decl::Var(decl) => decl.attributes.as_ref(),
+			Decl::Const(decl) => decl.attributes.as_ref(),
+			Decl::TypeAlias(_) => None,
+			Decl::Struct(decl) => decl.attributes.as_ref(),
+			Decl::Field(decl) => decl.attributes.as_ref(),
+			Decl::Function(decl) => decl.attributes.as_ref(),
+			Decl::Param(decl) => decl.attributes.as_ref(),
+			Decl::Extension(_) => None,
+			Decl::Module(_) => None,
+		}
+	}
 }
 
 impl<'a> Parse<'a> for Decl<'a> {
