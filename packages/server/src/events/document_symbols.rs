@@ -240,9 +240,7 @@ impl DocSymBuilder {
 	}
 
 	fn name<S>(mut self, name: S) -> Self
-	where
-		S: ToString,
-	{
+	where S: ToString {
 		self.name = Some(name.to_string());
 		self
 	}
@@ -258,9 +256,7 @@ impl DocSymBuilder {
 	}
 
 	fn detail<S>(mut self, detail: Option<S>) -> Self
-	where
-		S: ToString,
-	{
+	where S: ToString {
 		self.detail = detail.map(|inner| inner.to_string());
 		self
 	}

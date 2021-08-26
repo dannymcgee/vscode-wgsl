@@ -23,7 +23,8 @@ mod finder;
 
 use crate::lsp_extensions::{UnreadDependency, UnreadDependencyParams};
 pub use document::Document;
-use finder::{DeclFinder, FindDeclResult};
+use finder::DeclFinder;
+pub use finder::FindDeclResult;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Status {
@@ -148,6 +149,19 @@ impl<'a> Documents<'a> {
 			.map(|entry| unsafe { (entry.value() as *const Document).as_ref().unwrap() })
 	}
 
+	pub fn get_dependents_of(&self, uri: &Url) -> Vec<Url> {
+		self.documents
+			.iter()
+			.filter_map(|entry| {
+				if entry.value().deps.values().contains(uri) {
+					Some(entry.key().clone())
+				} else {
+					None
+				}
+			})
+			.collect()
+	}
+
 	pub fn find_decl(&self, uri: Url, token: Token<'a>) -> Option<FindDeclResult<'a>> {
 		let document = self.get(&uri)?;
 
@@ -216,9 +230,7 @@ impl<'a> DependencyResolver<'a> {
 impl<'a> Visitor<'a> for DependencyResolver<'a> {
 	fn visit_module_decl(&mut self, decl: &'a ModuleDecl<'a>) {
 		let name = decl.name.lexeme();
-		let path = decl.path.lexeme();
-		let slice = &path[1..path.len() - 1];
-		let uri = self.source.resolve_import(slice);
+		let uri = self.source.resolve_import(decl.path());
 
 		self.dependencies.insert(name, uri);
 	}

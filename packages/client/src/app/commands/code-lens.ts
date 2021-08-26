@@ -13,7 +13,7 @@ export async function resolveLensReferences(params: ReferenceParams) {
 
 		let locations = result.map(loc => client.protocol2CodeConverter.asLocation(loc));
 		let uri = client.protocol2CodeConverter.asUri(params.textDocument.uri);
-		let startPos = locations[0].range.start;
+		let startPos = locations[0]?.range.start;
 
 		await commands.executeCommand(
 			"editor.action.peekLocations",

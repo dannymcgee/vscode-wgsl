@@ -1,4 +1,4 @@
-use gramatika::{Parse, ParseStreamer, Span, Spanned, SpannedError};
+use gramatika::{Parse, ParseStreamer, Span, Spanned, SpannedError, Token as _};
 
 use crate::{
 	common::{AttributeList, TypeDecl},
@@ -521,6 +521,14 @@ impl<'a> Parse<'a> for ExtensionDecl<'a> {
 impl<'a> Spanned for ExtensionDecl<'a> {
 	fn span(&self) -> Span {
 		self.keyword.span().through(self.name.span())
+	}
+}
+
+impl<'a> ModuleDecl<'a> {
+	pub fn path(&'a self) -> &'a str {
+		let path = self.path.lexeme();
+
+		&path[1..path.len() - 1]
 	}
 }
 

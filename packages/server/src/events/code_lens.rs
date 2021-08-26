@@ -36,7 +36,7 @@ fn get_lenses(params: &CodeLensParams, docs: &Documents) -> Option<Vec<CodeLens>
 				line: ident_span.start.line as u32,
 				character: ident_span.start.character as u32,
 			};
-			let refs = references::find_in_file(uri, pos, false, docs)?;
+			let refs = references::find_all(uri, pos, false, docs)?;
 
 			let title = if refs.len() == 1 {
 				"1 Reference".to_string()

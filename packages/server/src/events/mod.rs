@@ -54,8 +54,7 @@ enum DocEvent {
 }
 
 pub struct Dispatcher<'a>
-where
-	'a: 'static,
+where 'a: 'static
 {
 	queue: Arc<Mutex<VecDeque<Request>>>,
 	documents: Arc<Documents<'a>>,

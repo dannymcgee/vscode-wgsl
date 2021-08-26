@@ -1,4 +1,4 @@
-use gramatika::{span, Spanned, Token as _};
+use gramatika::{span, Spanned};
 use lsp_server::{Message, RequestId, Response};
 use lsp_types::{GotoDefinitionParams, GotoDefinitionResponse, Location};
 use parser_v2::{decl::Decl, utils::ToRange, Token};
@@ -35,12 +35,7 @@ pub fn handle(id: RequestId, params: GotoDefinitionParams, docs: &Documents) -> 
 					let uri = found
 						.source_module
 						.and_then(|module| match module.as_ref() {
-							Decl::Module(inner) => {
-								let path = inner.path.lexeme();
-								let path = &path[1..path.len() - 1];
-
-								Some(uri.resolve_import(path))
-							}
+							Decl::Module(inner) => Some(uri.resolve_import(inner.path())),
 							_ => None,
 						})
 						.unwrap_or(uri);
