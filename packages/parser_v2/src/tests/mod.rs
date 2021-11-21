@@ -12,8 +12,8 @@ use gramatika::{Parse, ParseStream, ParseStreamer};
 use similar::{ChangeTag, TextDiff};
 use std::fmt;
 
-fn parse<'a, P>(input: &'a str)
-where P: Parse<'a, Stream = crate::ParseStream<'a>> + fmt::Debug {
+fn parse<P>(input: &str)
+where P: Parse<Stream = crate::ParseStream> + fmt::Debug {
 	match ParseStream::from(input).parse::<P>() {
 		Ok(tree) => eprintln!("{:#?}", tree),
 		Err(err) => {
@@ -34,7 +34,7 @@ fn diff(a: &str, b: &str) -> String {
 				ChangeTag::Equal => " ",
 			};
 
-			format!("{}{}", sign, change)
+			std::format!("{}{}", sign, change)
 		})
 		.collect()
 }

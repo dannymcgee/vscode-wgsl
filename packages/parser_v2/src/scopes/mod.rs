@@ -31,7 +31,7 @@ use std::{
 	sync::{Arc, Weak},
 };
 
-use gramatika::{Span, Spanned, Token as _};
+use gramatika::{Span, Spanned, Substr, Token as _};
 use parking_lot::RwLock;
 
 use crate::{decl::Decl, traversal::Walk, SyntaxTree, Token, TokenKind};
@@ -40,16 +40,16 @@ mod builder;
 use builder::ScopeBuilder;
 
 /// A mapping of identifier names to their declarations
-pub type Bindings<'a> = HashMap<(&'a str, TokenKind), Arc<Decl<'a>>>;
+pub type Bindings = HashMap<(Substr, TokenKind), Arc<Decl>>;
 
-pub struct Scope<'a> {
+pub struct Scope {
 	span: Span,
-	parent: Option<Weak<Scope<'a>>>,
-	children: RwLock<Vec<Arc<Scope<'a>>>>,
-	bindings: Arc<RwLock<Bindings<'a>>>,
+	parent: Option<Weak<Scope>>,
+	children: RwLock<Vec<Arc<Scope>>>,
+	bindings: Arc<RwLock<Bindings>>,
 }
 
-impl<'a> Spanned for Scope<'a> {
+impl Spanned for Scope {
 	fn span(&self) -> Span {
 		self.span
 	}
@@ -59,7 +59,7 @@ trait PrintKeys {
 	fn print_keys(&self) -> Result<String, fmt::Error>;
 }
 
-impl<'a> PrintKeys for Bindings<'a> {
+impl PrintKeys for Bindings {
 	fn print_keys(&self) -> Result<String, fmt::Error> {
 		let mut out = String::new();
 		let f = &mut out;
@@ -74,13 +74,13 @@ impl<'a> PrintKeys for Bindings<'a> {
 	}
 }
 
-impl<'a> fmt::Debug for Scope<'a> {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl fmt::Debug for Scope {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "{}", self.print(0)?)
 	}
 }
 
-pub fn build<'a>(syntax_tree: &'a SyntaxTree<'a>) -> Arc<Scope<'a>> {
+pub fn build(syntax_tree: &SyntaxTree) -> Arc<Scope> {
 	let span = syntax_tree.span();
 	let mut builder = ScopeBuilder::new(span);
 
@@ -88,7 +88,7 @@ pub fn build<'a>(syntax_tree: &'a SyntaxTree<'a>) -> Arc<Scope<'a>> {
 	builder.build()
 }
 
-impl<'a> Scope<'a> {
+impl Scope {
 	pub fn new(span: Span) -> Self {
 		Self {
 			span,
@@ -98,7 +98,7 @@ impl<'a> Scope<'a> {
 		}
 	}
 
-	pub fn with_parent(span: Span, parent: Arc<Scope<'a>>) -> Arc<Self> {
+	pub fn with_parent(span: Span, parent: Arc<Scope>) -> Arc<Self> {
 		let mut this = Self::new(span);
 		this.parent = Some(Arc::downgrade(&parent));
 
@@ -108,31 +108,17 @@ impl<'a> Scope<'a> {
 		arc_this
 	}
 
-	pub fn parent(&self) -> Option<Arc<Scope<'a>>> {
+	pub fn parent(&self) -> Option<Arc<Scope>> {
 		self.parent.as_ref().and_then(|env| env.upgrade())
 	}
 
-	pub fn find_decl(&self, token: Token<'a>) -> Option<Arc<Decl<'a>>> {
-		// FIXME: This comment block seems like it should work, but it breaks references
-		//
-		// let lexeme = token.lexeme();
-		// let kind = token.kind();
-		//
-		// let scope = self.find(token)?;
-		// let decl = scope
-		// 	.bindings
-		// 	.read()
-		// 	.get(&(lexeme, kind))
-		// 	.map(|decl| Arc::clone(decl))?;
-		//
-		// Some(decl)
-
+	pub fn find_decl(&self, token: &Token) -> Option<Arc<Decl>> {
 		let (lexeme, span) = token.as_inner();
 		let kind = token.kind();
 
 		if !self.span.contains(span) {
 			None
-		} else if self.bindings.read().contains_key(&(lexeme, kind)) {
+		} else if self.bindings.read().contains_key(&(lexeme.clone(), kind)) {
 			self.bindings
 				.read()
 				.get(&(lexeme, kind))
@@ -147,11 +133,7 @@ impl<'a> Scope<'a> {
 		}
 	}
 
-	pub fn find_field_decl(
-		&self,
-		token: Token<'a>,
-		struct_name: Token<'a>,
-	) -> Option<Arc<Decl<'a>>> {
+	pub fn find_field_decl(&self, token: &Token, struct_name: &Token) -> Option<Arc<Decl>> {
 		let (lexeme, span) = token.as_inner();
 		let field_key = &(lexeme, token.kind());
 		let struct_key = &(struct_name.lexeme(), TokenKind::Ident);
@@ -175,7 +157,7 @@ impl<'a> Scope<'a> {
 		}
 	}
 
-	pub fn find(&self, token: Token<'a>) -> Option<Arc<Scope<'a>>> {
+	pub fn find(&self, token: &Token) -> Option<Arc<Scope>> {
 		let (lexeme, span) = token.as_inner();
 		let kind = token.kind();
 
@@ -183,23 +165,12 @@ impl<'a> Scope<'a> {
 			return None;
 		}
 
-		// FIXME: This comment block seems like it should work, but it breaks references
-		//
-		// let child = self.children.read().iter().find_map(|scope| {
-		// 	if scope.span.contains(span) && scope.bindings.read().contains_key(&(lexeme, kind)) {
-		// 		Some(Arc::clone(scope))
-		// 	} else {
-		// 		None
-		// 	}
-		// })?;
-		//
-		// child.find(token).or(Some(child))
-
 		self.children
 			.read()
 			.iter()
 			.find_map(|scope| {
-				if scope.span.contains(span) && scope.bindings.read().contains_key(&(lexeme, kind))
+				if scope.span.contains(span)
+					&& scope.bindings.read().contains_key(&(lexeme.clone(), kind))
 				{
 					Some(Arc::clone(scope))
 				} else {
@@ -214,7 +185,7 @@ impl<'a> Scope<'a> {
 			})
 	}
 
-	fn define(&self, ident: (&'a str, TokenKind), decl: Decl<'a>) {
+	fn define(&self, ident: (Substr, TokenKind), decl: Decl) {
 		self.bindings.write().insert(ident, Arc::new(decl));
 	}
 

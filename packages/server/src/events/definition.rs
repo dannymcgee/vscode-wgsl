@@ -5,7 +5,7 @@ use parser_v2::{decl::Decl, utils::ToRange, Token};
 use serde_json as json;
 use wgsl_plus::ResolveImportPath;
 
-use crate::documents_v2::Documents;
+use crate::documents::Documents;
 
 pub fn handle(id: RequestId, params: GotoDefinitionParams, docs: &Documents) -> Message {
 	let uri = params.text_document_position_params.text_document.uri;
@@ -20,7 +20,7 @@ pub fn handle(id: RequestId, params: GotoDefinitionParams, docs: &Documents) -> 
 				pos >= range.start && pos <= range.end
 			})?;
 
-			match *needle {
+			match needle {
 				Token::Path(lexeme, _) => {
 					let path = &lexeme[1..lexeme.len() - 1];
 					let uri = uri.resolve_import(path);
@@ -30,12 +30,12 @@ pub fn handle(id: RequestId, params: GotoDefinitionParams, docs: &Documents) -> 
 						range: span![0:0...0:0].to_range(),
 					}))
 				}
-				other => docs.find_decl(uri.clone(), other).map(|found| {
+				other => docs.find_decl(&uri, other).map(|found| {
 					let range = found.decl.name().span().to_range();
 					let uri = found
 						.source_module
 						.and_then(|module| match module.as_ref() {
-							Decl::Module(inner) => Some(uri.resolve_import(inner.path())),
+							Decl::Module(inner) => Some(uri.resolve_import(inner.path().as_str())),
 							_ => None,
 						})
 						.unwrap_or(uri);

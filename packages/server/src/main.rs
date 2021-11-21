@@ -9,8 +9,9 @@ extern crate gramatika;
 
 mod capabilities;
 mod diagnostics;
+// mod diagnostics_old;
 mod documents;
-mod documents_v2;
+// mod documents_old;
 mod events;
 mod lsp_extensions;
 
@@ -21,9 +22,9 @@ fn main() -> Result<(), Error> {
 	let capabilities = capabilities::define();
 	let init_params = cx.initialize(capabilities)?;
 
-	unsafe {
-		diagnostics::bootstrap(cx.sender.clone());
-	}
+	// unsafe {
+	// 	diagnostics_old::bootstrap(cx.sender.clone());
+	// }
 	main_loop(&cx, init_params)?;
 
 	io_threads.join()?;

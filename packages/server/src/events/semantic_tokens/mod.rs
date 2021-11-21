@@ -7,7 +7,7 @@ use lsp_types::{SemanticToken, SemanticTokens, SemanticTokensParams, Url};
 use parser_v2::traversal::Walk;
 use serde_json as json;
 
-use crate::documents_v2::Documents;
+use crate::documents::Documents;
 
 mod builder;
 mod deltas;
@@ -39,7 +39,7 @@ fn get_semantic_tokens(uri: Url, docs: &Documents) -> SemanticTokens {
 	let scopes = Arc::clone(&document.scopes);
 	let deps = Arc::clone(&document.deps)
 		.iter()
-		.map(|(name, uri)| (*name, docs.get(uri).unwrap()))
+		.map(|(name, uri)| (name.clone(), docs.get(uri).unwrap()))
 		.collect();
 
 	let mut builder = SemanticTokensBuilder::new(scopes, deps);

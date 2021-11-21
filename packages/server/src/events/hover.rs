@@ -6,21 +6,23 @@ use lsp_types::{Hover, HoverContents, HoverParams, MarkedString};
 use parser_v2::{decl::Decl, utils::ToRange};
 use serde_json as json;
 
-use crate::documents_v2::Documents;
+use crate::documents::Documents;
 
 pub fn handle(id: RequestId, params: HoverParams, docs: &Documents) -> Message {
 	let uri = params.text_document_position_params.text_document.uri;
 	let pos = params.text_document_position_params.position;
 
 	let result = docs.get(&uri).and_then(|document| {
-		let tokens = &document.tokens;
-		let needle = tokens.iter().find(|token| {
-			let range = token.span().to_range();
-			pos >= range.start && pos <= range.end
-		})?;
+		let tokens = document.tokens;
+		let needle = tokens
+			.iter()
+			.find(|token| {
+				let range = token.span().to_range();
+				pos >= range.start && pos <= range.end
+			})?
+			.clone();
 
-		docs.find_decl(uri.clone(), *needle)
-			.map(|found| (needle, found))
+		docs.find_decl(&uri, &needle).map(|found| (needle, found))
 	});
 
 	match result {
@@ -30,7 +32,7 @@ pub fn handle(id: RequestId, params: HoverParams, docs: &Documents) -> Message {
 			if let Some(module) = found.source_module {
 				contents.push(MarkedString::from_language_code(
 					"wgsl".into(),
-					format!("{}", module.as_ref()),
+					std::format!("{}", module.as_ref()),
 				));
 			}
 
@@ -41,7 +43,7 @@ pub fn handle(id: RequestId, params: HoverParams, docs: &Documents) -> Message {
 
 						write!(&mut f, "{}", inner.storage).unwrap();
 
-						if let Some(modifier) = inner.storage_modifier {
+						if let Some(ref modifier) = inner.storage_modifier {
 							write!(&mut f, "<{}>", modifier).unwrap();
 						}
 
@@ -53,7 +55,7 @@ pub fn handle(id: RequestId, params: HoverParams, docs: &Documents) -> Message {
 					}
 					_ => unreachable!(),
 				},
-				_ => format!("{}", found.decl.as_ref()),
+				_ => std::format!("{}", found.decl.as_ref()),
 			};
 
 			contents.push(MarkedString::from_language_code(

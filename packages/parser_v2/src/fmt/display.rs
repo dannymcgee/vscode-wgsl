@@ -10,14 +10,14 @@ use crate::{
 
 use super::Tooltip;
 
-impl<'a> fmt::Display for TypeDecl<'a> {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		if let Some(namespace) = self.name.namespace {
+impl fmt::Display for TypeDecl {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		if let Some(ref namespace) = self.name.namespace {
 			write!(f, "{}::", namespace)?;
 		}
 		write!(f, "{}", self.name.name)?;
 
-		if let Some(child_ty) = self.child_ty {
+		if let Some(ref child_ty) = self.child_ty {
 			write!(f, "<{}>", child_ty)?;
 		}
 
@@ -25,11 +25,11 @@ impl<'a> fmt::Display for TypeDecl<'a> {
 	}
 }
 
-impl<'a> fmt::Display for Attribute<'a> {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl fmt::Display for Attribute {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "{}", self.name)?;
 
-		if let Some(value) = self.value {
+		if let Some(ref value) = self.value {
 			write!(f, "({})", value)?;
 		}
 
@@ -37,8 +37,8 @@ impl<'a> fmt::Display for Attribute<'a> {
 	}
 }
 
-impl<'a> fmt::Display for AttributeList<'a> {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl fmt::Display for AttributeList {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let inner = self.attributes.iter().join(", ");
 
 		write!(f, "[[{}]]", inner)
@@ -46,14 +46,14 @@ impl<'a> fmt::Display for AttributeList<'a> {
 }
 
 // FIXME
-impl<'a> fmt::Display for Decl<'a> {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl fmt::Display for Decl {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		Tooltip::fmt(self, f)
 	}
 }
 
-impl<'a> fmt::Display for FieldDecl<'a> {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl fmt::Display for FieldDecl {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		if let Some(ref attributes) = self.attributes {
 			write!(f, "{} ", attributes)?;
 		}
@@ -61,8 +61,8 @@ impl<'a> fmt::Display for FieldDecl<'a> {
 	}
 }
 
-impl<'a> fmt::Display for IdentExpr<'a> {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl fmt::Display for IdentExpr {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		if let Some(ref namespace) = self.namespace {
 			write!(f, "{}::", namespace)?;
 		}

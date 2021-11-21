@@ -11,7 +11,7 @@ pub fn parsing(c: &mut Criterion) {
 	group.confidence_level(0.99);
 
 	let programs = hashmap![
-		"shader.wgsl" => include_str!("../test-files/shader.wgsl"),
+		// "shader.wgsl" => include_str!("../test-files/shader.wgsl"),
 		"boids.wgsl" => include_str!("../test-files/boids.wgsl"),
 		"shadow.wgsl" => include_str!("../test-files/shadow.wgsl"),
 		"water.wgsl" => include_str!("../test-files/water.wgsl"),

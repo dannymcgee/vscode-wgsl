@@ -1,6 +1,6 @@
-use std::fmt;
+use std::{fmt, sync::Arc};
 
-use gramatika::{debug, Parse, ParseStreamer, Result, Span, Spanned, SpannedError};
+use gramatika::{debug, Parse, ParseStreamer, Result, Span, Spanned, SpannedError, Token as _};
 
 use crate::{
 	common::{ArgumentList, TypeDecl},
@@ -8,84 +8,89 @@ use crate::{
 };
 
 #[derive(Clone, DebugLisp)]
-pub enum Expr<'a> {
-	Unary(UnaryExpr<'a>),
-	Binary(BinaryExpr<'a>),
-	Assignment(BinaryExpr<'a>),
-	FnCall(FnCallExpr<'a>),
-	TypeCtor(TypeCtorExpr<'a>),
-	Group(GroupExpr<'a>),
-	Bitcast(BitcastExpr<'a>),
-	Literal(Token<'a>),
-	Ident(IdentExpr<'a>),
-	Primary(PrimaryExpr<'a>),
+pub enum Expr {
+	Unary(UnaryExpr),
+	Binary(BinaryExpr),
+	Assignment(BinaryExpr),
+	FnCall(FnCallExpr),
+	TypeCtor(TypeCtorExpr),
+	Group(GroupExpr),
+	Bitcast(BitcastExpr),
+	Literal(Token),
+	Ident(IdentExpr),
+	Primary(PrimaryExpr),
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct UnaryExpr<'a> {
-	pub op: Token<'a>,
-	pub expr: Box<Expr<'a>>,
+pub struct UnaryExpr {
+	pub op: Token,
+	pub expr: Arc<Expr>,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct BinaryExpr<'a> {
-	pub lhs: Box<Expr<'a>>,
-	pub op: Token<'a>,
-	pub rhs: Box<Expr<'a>>,
+pub struct BinaryExpr {
+	pub lhs: Arc<Expr>,
+	pub op: Token,
+	pub rhs: Arc<Expr>,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct FnCallExpr<'a> {
-	pub ident: IdentExpr<'a>,
-	pub arguments: ArgumentList<'a>,
+pub struct FnCallExpr {
+	pub ident: IdentExpr,
+	pub arguments: ArgumentList,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct TypeCtorExpr<'a> {
-	pub ty: TypeDecl<'a>,
-	pub arguments: ArgumentList<'a>,
+pub struct TypeCtorExpr {
+	pub ty: TypeDecl,
+	pub arguments: ArgumentList,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct GroupExpr<'a> {
-	pub brace_open: Token<'a>,
-	pub expr: Box<Expr<'a>>,
-	pub brace_close: Token<'a>,
+pub struct GroupExpr {
+	pub brace_open: Token,
+	pub expr: Arc<Expr>,
+	pub brace_close: Token,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct BitcastExpr<'a> {
-	pub keyword: Token<'a>,
-	pub ty: TypeDecl<'a>,
-	pub expr: GroupExpr<'a>,
+pub struct BitcastExpr {
+	pub keyword: Token,
+	pub ty: TypeDecl,
+	pub expr: GroupExpr,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct IdentExpr<'a> {
-	pub namespace: Option<Token<'a>>,
-	pub name: Token<'a>,
+pub struct IdentExpr {
+	pub namespace: Option<Token>,
+	pub name: Token,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct PrimaryExpr<'a> {
-	pub expr: Box<Expr<'a>>,
-	pub postfix: Option<PostfixExpr<'a>>,
+pub struct PrimaryExpr {
+	pub expr: Arc<Expr>,
+	pub postfix: Option<PostfixExpr>,
+}
+
+struct PrimaryExprBuilder {
+	pub expr: Box<Expr>,
+	pub postfix: Option<PostfixExpr>,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct PostfixExpr<'a> {
-	pub accessor: Accessor<'a>,
-	pub expr: Box<Expr<'a>>,
-	pub postfix: Option<Box<PostfixExpr<'a>>>,
+pub struct PostfixExpr {
+	pub accessor: Accessor,
+	pub expr: Arc<Expr>,
+	pub postfix: Option<Arc<PostfixExpr>>,
 }
 
 #[derive(Clone)]
-pub enum Accessor<'a> {
-	Dot(Token<'a>),
-	Index([Token<'a>; 2]),
+pub enum Accessor {
+	Dot(Token),
+	Index([Token; 2]),
 }
 
-impl<'a> gramatika::DebugLisp for Accessor<'a> {
+impl gramatika::DebugLisp for Accessor {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>, indent: usize) -> fmt::Result {
 		match self {
 			Accessor::Dot(token) => write!(f, "(Accessor::Dot {:?})", token),
@@ -103,31 +108,31 @@ impl<'a> gramatika::DebugLisp for Accessor<'a> {
 
 // -- Recursive descent trait ------------------------------------------------------------
 
-trait RecursiveDescent<'a> {
+trait RecursiveDescent {
 	type Token: gramatika::Token;
 
-	fn assignment(&mut self) -> Result<'a, Expr<'a>>;
-	fn short_circuit_or(&mut self) -> Result<'a, Expr<'a>>;
-	fn short_circuit_and(&mut self) -> Result<'a, Expr<'a>>;
-	fn inclusive_or(&mut self) -> Result<'a, Expr<'a>>;
-	fn exclusive_or(&mut self) -> Result<'a, Expr<'a>>;
-	fn and(&mut self) -> Result<'a, Expr<'a>>;
-	fn equality(&mut self) -> Result<'a, Expr<'a>>;
-	fn relational(&mut self) -> Result<'a, Expr<'a>>;
-	fn shift(&mut self) -> Result<'a, Expr<'a>>;
-	fn additive(&mut self) -> Result<'a, Expr<'a>>;
-	fn multiplicative(&mut self) -> Result<'a, Expr<'a>>;
-	fn unary(&mut self) -> Result<'a, Expr<'a>>;
+	fn assignment(&mut self) -> Result<Expr>;
+	fn short_circuit_or(&mut self) -> Result<Expr>;
+	fn short_circuit_and(&mut self) -> Result<Expr>;
+	fn inclusive_or(&mut self) -> Result<Expr>;
+	fn exclusive_or(&mut self) -> Result<Expr>;
+	fn and(&mut self) -> Result<Expr>;
+	fn equality(&mut self) -> Result<Expr>;
+	fn relational(&mut self) -> Result<Expr>;
+	fn shift(&mut self) -> Result<Expr>;
+	fn additive(&mut self) -> Result<Expr>;
+	fn multiplicative(&mut self) -> Result<Expr>;
+	fn unary(&mut self) -> Result<Expr>;
 	fn binary(
 		&mut self,
 		operators: &[Self::Token],
-		operand_method: fn(&mut Self) -> Result<'a, Expr<'a>>,
-	) -> Result<'a, Expr<'a>>;
+		operand_method: fn(&mut Self) -> Result<Expr>,
+	) -> Result<Expr>;
 }
 
 // --- gramatika impls -------------------------------------------------------------------
 
-impl<'a> Spanned for Expr<'a> {
+impl Spanned for Expr {
 	fn span(&self) -> Span {
 		match self {
 			Expr::Unary(inner) => inner.op.span().through(inner.expr.span()),
@@ -144,7 +149,7 @@ impl<'a> Spanned for Expr<'a> {
 	}
 }
 
-impl<'a> Spanned for PrimaryExpr<'a> {
+impl Spanned for PrimaryExpr {
 	fn span(&self) -> Span {
 		match self.postfix {
 			Some(ref postfix) => self.expr.span().through(postfix.span()),
@@ -153,7 +158,7 @@ impl<'a> Spanned for PrimaryExpr<'a> {
 	}
 }
 
-impl<'a> Spanned for PostfixExpr<'a> {
+impl Spanned for PostfixExpr {
 	fn span(&self) -> Span {
 		match self.postfix {
 			Some(ref postfix) => self.expr.span().through(postfix.span()),
@@ -162,7 +167,7 @@ impl<'a> Spanned for PostfixExpr<'a> {
 	}
 }
 
-impl<'a> Spanned for IdentExpr<'a> {
+impl Spanned for IdentExpr {
 	fn span(&self) -> Span {
 		match self.namespace {
 			Some(ref token) => token.span().through(self.name.span()),
@@ -171,60 +176,60 @@ impl<'a> Spanned for IdentExpr<'a> {
 	}
 }
 
-impl<'a> Spanned for FnCallExpr<'a> {
+impl Spanned for FnCallExpr {
 	fn span(&self) -> Span {
 		self.ident.span().through(self.arguments.brace_close.span())
 	}
 }
 
-impl<'a> Parse<'a> for Expr<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for Expr {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> Result<'a, Self> {
+	fn parse(input: &mut Self::Stream) -> Result<Self> {
 		input.assignment()
 	}
 }
 
-impl<'a> Parse<'a> for PrimaryExpr<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for PrimaryExprBuilder {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> Result<'a, Self> {
-		use Token::*;
+	fn parse(input: &mut Self::Stream) -> Result<Self> {
+		use TokenKind::*;
 
 		let expr = match input.peek() {
-			Some(Type(_, _)) => Ok(Expr::TypeCtor(input.parse::<TypeCtorExpr>()?)),
-			Some(Brace("(", _)) => Ok(Expr::Group(input.parse::<GroupExpr>()?)),
-			Some(Keyword("bitcast", _)) => Ok(Expr::Bitcast(input.parse::<BitcastExpr>()?)),
-			Some(
-				IntLiteral(_, _)
-				| UintLiteral(_, _)
-				| FloatLiteral(_, _)
-				| Keyword("true" | "false", _),
-			) => {
-				let token = input.next().unwrap();
-				Ok(Expr::Literal(token))
-			}
-			Some(Ident(_, _)) => {
-				let mut ident = input.parse::<IdentExpr>()?;
-
-				if input.check(brace!["("]) {
-					ident.name = input.upgrade_last(TokenKind::Ident, Token::function)?;
-					let arguments = input.parse::<ArgumentList>()?;
-
-					Ok(Expr::FnCall(FnCallExpr { ident, arguments }))
-				} else {
-					Ok(Expr::Ident(ident))
+			Some(token) => match token.as_matchable() {
+				(Type, _, _) => Ok(Expr::TypeCtor(input.parse::<TypeCtorExpr>()?)),
+				(Brace, "(", _) => Ok(Expr::Group(input.parse::<GroupExpr>()?)),
+				(Keyword, "bitcast", _) => Ok(Expr::Bitcast(input.parse::<BitcastExpr>()?)),
+				(IntLiteral, _, _)
+				| (UintLiteral, _, _)
+				| (FloatLiteral, _, _)
+				| (Keyword, "true" | "false", _) => {
+					let token = input.next().unwrap();
+					Ok(Expr::Literal(token))
 				}
-			}
-			Some(Comment(_, _)) => {
-				input.discard();
-				input.parse::<Expr>()
-			}
-			Some(other) => Err(SpannedError {
-				message: "Expected expression".into(),
-				span: Some(other.span()),
-				source: input.source(),
-			}),
+				(Ident, _, _) => {
+					let mut ident = input.parse::<IdentExpr>()?;
+
+					if input.check(brace!["("]) {
+						ident.name = input.upgrade_last(TokenKind::Ident, Token::function)?;
+						let arguments = input.parse::<ArgumentList>()?;
+
+						Ok(Expr::FnCall(FnCallExpr { ident, arguments }))
+					} else {
+						Ok(Expr::Ident(ident))
+					}
+				}
+				(Comment, _, _) => {
+					input.discard();
+					input.parse::<Expr>()
+				}
+				(_, _, span) => Err(SpannedError {
+					message: "Expected expression".into(),
+					span: Some(span),
+					source: input.source(),
+				}),
+			},
 			None => Err(SpannedError {
 				message: "Unexpected end of input".into(),
 				source: input.source(),
@@ -232,22 +237,31 @@ impl<'a> Parse<'a> for PrimaryExpr<'a> {
 			}),
 		}?;
 
-		let postfix = match input.peek() {
-			Some(Punct(".", _) | Punct("[", _)) => Some(input.parse::<PostfixExpr>()?),
+		let postfix = match input.peek().map(|t| t.as_matchable()) {
+			Some((Punct, ".", _) | (Brace, "[", _)) => Some(input.parse::<PostfixExpr>()?),
 			_ => None,
 		};
 
-		Ok(PrimaryExpr {
+		Ok(PrimaryExprBuilder {
 			expr: Box::new(expr),
 			postfix,
 		})
 	}
 }
 
-impl<'a> Parse<'a> for FnCallExpr<'a> {
-	type Stream = ParseStream<'a>;
+impl PrimaryExprBuilder {
+	fn build(self) -> PrimaryExpr {
+		PrimaryExpr {
+			expr: self.expr.into(),
+			postfix: self.postfix,
+		}
+	}
+}
 
-	fn parse(input: &mut Self::Stream) -> Result<'a, Self> {
+impl Parse for FnCallExpr {
+	type Stream = ParseStream;
+
+	fn parse(input: &mut Self::Stream) -> Result<Self> {
 		let mut ident = input.parse::<IdentExpr>()?;
 		ident.name = input.upgrade_last(TokenKind::Ident, Token::function)?;
 		let arguments = input.parse::<ArgumentList>()?;
@@ -256,10 +270,10 @@ impl<'a> Parse<'a> for FnCallExpr<'a> {
 	}
 }
 
-impl<'a> Parse<'a> for TypeCtorExpr<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for TypeCtorExpr {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> Result<'a, Self> {
+	fn parse(input: &mut Self::Stream) -> Result<Self> {
 		let ty = input.parse::<TypeDecl>()?;
 		let arguments = input.parse::<ArgumentList>()?;
 
@@ -267,26 +281,26 @@ impl<'a> Parse<'a> for TypeCtorExpr<'a> {
 	}
 }
 
-impl<'a> Parse<'a> for GroupExpr<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for GroupExpr {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> Result<'a, Self> {
+	fn parse(input: &mut Self::Stream) -> Result<Self> {
 		let brace_open = input.consume(brace!["("])?;
 		let expr = input.parse::<Expr>()?;
 		let brace_close = input.consume(brace![")"])?;
 
 		Ok(Self {
 			brace_open,
-			expr: Box::new(expr),
+			expr: Arc::new(expr),
 			brace_close,
 		})
 	}
 }
 
-impl<'a> Parse<'a> for BitcastExpr<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for BitcastExpr {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> Result<'a, Self> {
+	fn parse(input: &mut Self::Stream) -> Result<Self> {
 		let keyword = input.consume(keyword![bitcast])?;
 		input.consume(operator![<])?;
 		let ty = input.parse::<TypeDecl>()?;
@@ -297,10 +311,10 @@ impl<'a> Parse<'a> for BitcastExpr<'a> {
 	}
 }
 
-impl<'a> Parse<'a> for IdentExpr<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for IdentExpr {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> Result<'a, Self> {
+	fn parse(input: &mut Self::Stream) -> Result<Self> {
 		let mut ident = input.consume_kind(TokenKind::Ident)?;
 
 		if input.check(punct![::]) {
@@ -321,31 +335,31 @@ impl<'a> Parse<'a> for IdentExpr<'a> {
 	}
 }
 
-impl<'a> Parse<'a> for PostfixExpr<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for PostfixExpr {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> Result<'a, Self> {
-		use Token::*;
+	fn parse(input: &mut Self::Stream) -> Result<Self> {
+		use TokenKind::*;
 
 		if input.check(punct![.]) {
 			let dot = input.next().unwrap();
 			let accessor = Accessor::Dot(dot);
 
-			let mut expr = input.parse::<PrimaryExpr>()?;
+			let mut expr = input.parse::<PrimaryExprBuilder>()?;
 			if let Expr::Ident(IdentExpr { name, .. }) = expr.expr.as_mut() {
-				*name = input.upgrade(*name, Token::field)?;
+				*name = input.upgrade(name.clone(), Token::field)?;
 			}
 
-			let postfix = match input.peek() {
-				Some(Punct(".", _) | Brace("[", _)) => {
-					Some(Box::new(input.parse::<PostfixExpr>()?))
+			let postfix = match input.peek().map(|t| t.as_matchable()) {
+				Some((Punct, ".", _) | (Brace, "[", _)) => {
+					Some(Arc::new(input.parse::<PostfixExpr>()?))
 				}
 				_ => None,
 			};
 
 			Ok(Self {
 				accessor,
-				expr: Box::new(Expr::Primary(expr)),
+				expr: Arc::new(Expr::Primary(expr.build())),
 				postfix,
 			})
 		} else {
@@ -353,16 +367,16 @@ impl<'a> Parse<'a> for PostfixExpr<'a> {
 			let expr = input.parse::<Expr>()?;
 			let brace_close = input.consume(brace!["]"])?;
 
-			let postfix = match input.peek() {
-				Some(Punct(".", _) | Brace("[", _)) => {
-					Some(Box::new(input.parse::<PostfixExpr>()?))
+			let postfix = match input.peek().map(|t| t.as_matchable()) {
+				Some((Punct, ".", _) | (Brace, "[", _)) => {
+					Some(Arc::new(input.parse::<PostfixExpr>()?))
 				}
 				_ => None,
 			};
 
 			Ok(Self {
 				accessor: Accessor::Index([brace_open, brace_close]),
-				expr: Box::new(expr),
+				expr: Arc::new(expr),
 				postfix,
 			})
 		}
@@ -371,10 +385,10 @@ impl<'a> Parse<'a> for PostfixExpr<'a> {
 
 // --- RecursiveDescent impl -------------------------------------------------------------
 
-impl<'a> RecursiveDescent<'a> for ParseStream<'a> {
-	type Token = Token<'a>;
+impl RecursiveDescent for ParseStream {
+	type Token = Token;
 
-	fn assignment(&mut self) -> Result<'a, Expr<'a>> {
+	fn assignment(&mut self) -> Result<Expr> {
 		let lhs = self.short_circuit_or()?;
 
 		if self.check(operator![=]) {
@@ -386,9 +400,9 @@ impl<'a> RecursiveDescent<'a> for ParseStream<'a> {
 					if matches!(expr.as_ref(), Expr::Ident(_)) =>
 				{
 					Ok(Expr::Assignment(BinaryExpr {
-						lhs: Box::new(lhs),
+						lhs: Arc::new(lhs),
 						op: eq,
-						rhs: Box::new(value),
+						rhs: Arc::new(value),
 					}))
 				}
 				other => Err(SpannedError {
@@ -402,81 +416,81 @@ impl<'a> RecursiveDescent<'a> for ParseStream<'a> {
 		}
 	}
 
-	fn short_circuit_or(&mut self) -> Result<'a, Expr<'a>> {
+	fn short_circuit_or(&mut self) -> Result<Expr> {
 		self.binary(&[operator![||]], Self::short_circuit_and)
 	}
 
-	fn short_circuit_and(&mut self) -> Result<'a, Expr<'a>> {
+	fn short_circuit_and(&mut self) -> Result<Expr> {
 		self.binary(&[operator![&&]], Self::inclusive_or)
 	}
 
-	fn inclusive_or(&mut self) -> Result<'a, Expr<'a>> {
+	fn inclusive_or(&mut self) -> Result<Expr> {
 		self.binary(&[operator![|]], Self::exclusive_or)
 	}
 
-	fn exclusive_or(&mut self) -> Result<'a, Expr<'a>> {
+	fn exclusive_or(&mut self) -> Result<Expr> {
 		self.binary(&[operator![^]], Self::and)
 	}
 
-	fn and(&mut self) -> Result<'a, Expr<'a>> {
+	fn and(&mut self) -> Result<Expr> {
 		self.binary(&[operator![&]], Self::equality)
 	}
 
-	fn equality(&mut self) -> Result<'a, Expr<'a>> {
+	fn equality(&mut self) -> Result<Expr> {
 		self.binary(&[operator![==], operator![!=]], Self::relational)
 	}
 
-	fn relational(&mut self) -> Result<'a, Expr<'a>> {
+	fn relational(&mut self) -> Result<Expr> {
 		self.binary(
 			&[operator![<=], operator![>=], operator![<], operator![>]],
 			Self::shift,
 		)
 	}
 
-	fn shift(&mut self) -> Result<'a, Expr<'a>> {
+	fn shift(&mut self) -> Result<Expr> {
 		self.binary(&[operator![<<], operator![>>]], Self::additive)
 	}
 
-	fn additive(&mut self) -> Result<'a, Expr<'a>> {
+	fn additive(&mut self) -> Result<Expr> {
 		self.binary(&[operator!["+"], operator!["-"]], Self::multiplicative)
 	}
 
-	fn multiplicative(&mut self) -> Result<'a, Expr<'a>> {
+	fn multiplicative(&mut self) -> Result<Expr> {
 		self.binary(&[operator![*], operator![/], operator![%]], Self::unary)
 	}
 
-	fn unary(&mut self) -> Result<'a, Expr<'a>> {
+	fn unary(&mut self) -> Result<Expr> {
 		if matches!(
-			self.peek(),
-			Some(Token::Operator("-" | "!" | "~" | "*" | "&", _))
+			self.peek().map(|t| t.as_matchable()),
+			Some((TokenKind::Operator, "-" | "!" | "~" | "*" | "&", _))
 		) {
 			let op = self.next().unwrap();
 			let expr = self.unary()?;
 
 			Ok(Expr::Unary(UnaryExpr {
 				op,
-				expr: Box::new(expr),
+				expr: Arc::new(expr),
 			}))
 		} else {
-			Ok(Expr::Primary(self.parse()?))
+			Ok(Expr::Primary(self.parse::<PrimaryExprBuilder>()?.build()))
 		}
 	}
 
 	fn binary(
 		&mut self,
 		operators: &[Self::Token],
-		operand_method: fn(&mut Self) -> Result<'a, Expr<'a>>,
-	) -> Result<'a, Expr<'a>> {
+		operand_method: fn(&mut Self) -> Result<Expr>,
+	) -> Result<Expr> {
 		let mut expr = operand_method(self)?;
 
-		while operators.iter().any(|op| self.check(*op)) {
+		while operators.iter().any(|op| self.check(op.clone())) {
 			let op = self.next().unwrap();
 			let rhs = operand_method(self)?;
 
 			expr = Expr::Binary(BinaryExpr {
-				lhs: Box::new(expr),
+				lhs: Arc::new(expr),
 				op,
-				rhs: Box::new(rhs),
+				rhs: Arc::new(rhs),
 			});
 		}
 

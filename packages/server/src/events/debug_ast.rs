@@ -1,7 +1,7 @@
 use lsp_server::{Message, RequestId, Response};
 use serde_json as json;
 
-use crate::{documents_v2::Documents, lsp_extensions::DebugDocumentParams};
+use crate::{documents::Documents, lsp_extensions::DebugDocumentParams};
 
 pub fn handle(id: RequestId, params: DebugDocumentParams, docs: &Documents) -> Message {
 	let uri = params.text_document.uri;
@@ -10,7 +10,7 @@ pub fn handle(id: RequestId, params: DebugDocumentParams, docs: &Documents) -> M
 		.get(&uri)
 		.map(|document| {
 			let tree = document.ast.as_ref();
-			format!("{:#?}", tree)
+			std::format!("{:#?}", tree)
 		})
 		.unwrap_or_else(|| "".into());
 

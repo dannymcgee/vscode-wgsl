@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use gramatika::Token as _;
+use gramatika::{Substr, Token as _};
 use parser_v2::{
 	common::TypeDecl,
 	decl::{Decl, VarDecl},
@@ -11,16 +11,16 @@ use parser_v2::{
 };
 
 use super::{TokenMod, TokenType};
-use crate::documents_v2::Document;
+use crate::documents::Document;
 
-pub struct SemanticTokensBuilder<'a> {
-	scopes: Arc<Scope<'a>>,
-	deps: HashMap<&'a str, &'a Document<'a>>,
-	result: HashMap<Token<'a>, (TokenType, TokenMod)>,
+pub struct SemanticTokensBuilder {
+	scopes: Arc<Scope>,
+	deps: HashMap<Substr, Document>,
+	result: HashMap<Token, (TokenType, TokenMod)>,
 }
 
-impl<'a> SemanticTokensBuilder<'a> {
-	pub fn new(scopes: Arc<Scope<'a>>, deps: HashMap<&'a str, &'a Document<'a>>) -> Self {
+impl SemanticTokensBuilder {
+	pub fn new(scopes: Arc<Scope>, deps: HashMap<Substr, Document>) -> Self {
 		Self {
 			scopes,
 			deps,
@@ -28,13 +28,13 @@ impl<'a> SemanticTokensBuilder<'a> {
 		}
 	}
 
-	pub fn build(self) -> HashMap<Token<'a>, (TokenType, TokenMod)> {
+	pub fn build(self) -> HashMap<Token, (TokenType, TokenMod)> {
 		self.result
 	}
 }
 
-impl<'a> Visitor<'a> for SemanticTokensBuilder<'a> {
-	fn visit_decl(&mut self, decl: &'a Decl<'a>) -> FlowControl {
+impl Visitor for SemanticTokensBuilder {
+	fn visit_decl(&mut self, decl: &Decl) -> FlowControl {
 		let (ttype, tmod): (TokenType, TokenMod) = match decl {
 			Decl::Var(_) => (TokenType::Variable, TokenMod::DECL),
 			Decl::Const(_) => (TokenType::Variable, TokenMod::DECL | TokenMod::READONLY),
@@ -46,21 +46,23 @@ impl<'a> Visitor<'a> for SemanticTokensBuilder<'a> {
 			Decl::Extension(_) => (TokenType::Namespace, TokenMod::DECL),
 			Decl::Module(_) => (TokenType::Namespace, TokenMod::DECL),
 		};
-		self.result.insert(decl.name(), (ttype, tmod));
+		self.result.insert(decl.name().clone(), (ttype, tmod));
 
 		FlowControl::Continue
 	}
 
-	fn visit_type(&mut self, decl: &'a TypeDecl<'a>) -> FlowControl {
+	fn visit_type(&mut self, decl: &TypeDecl) -> FlowControl {
 		// If this is a generic type (e.g. `vec3<f32>`), we need to register the component
 		// type here. We also mark the parent type as a built-in struct (struct because it
 		// has fields, and built-in because it's not currently possible for users to define
 		// generic types).
-		if let Some(token) = decl.child_ty {
+		if let Some(ref token) = decl.child_ty {
+			self.result.insert(
+				decl.name.name.clone(),
+				(TokenType::Struct, TokenMod::BUILTIN),
+			);
 			self.result
-				.insert(decl.name.name, (TokenType::Struct, TokenMod::BUILTIN));
-			self.result
-				.insert(token, (TokenType::Type, TokenMod::BUILTIN));
+				.insert(token.clone(), (TokenType::Type, TokenMod::BUILTIN));
 
 			// Avoid trying to re-visit the ident expression
 			FlowControl::Break
@@ -69,7 +71,7 @@ impl<'a> Visitor<'a> for SemanticTokensBuilder<'a> {
 		}
 	}
 
-	fn visit_var_decl(&mut self, decl: &'a VarDecl<'a>) -> FlowControl {
+	fn visit_var_decl(&mut self, decl: &VarDecl) -> FlowControl {
 		// This implementation is necessary for variable statements, which wrap a `VarDecl`
 		// struct directly, but if it's a top-level declaration then `visit_decl` will have
 		// already handled it.
@@ -79,20 +81,21 @@ impl<'a> Visitor<'a> for SemanticTokensBuilder<'a> {
 
 		// Without the `Decl` enum wrapper, we need to check the storage keyword to
 		// determine the mutability modifier.
-		let tmod = match decl.storage.lexeme() {
+		let tmod = match decl.storage.lexeme().as_str() {
 			"let" => TokenMod::DECL | TokenMod::READONLY,
 			"var" => TokenMod::DECL,
 			_ => unreachable!(),
 		};
-		self.result.insert(decl.name, (TokenType::Variable, tmod));
+		self.result
+			.insert(decl.name.clone(), (TokenType::Variable, tmod));
 
 		FlowControl::Continue
 	}
 
-	fn visit_fn_call_expr(&mut self, expr: &'a FnCallExpr<'a>) -> FlowControl {
+	fn visit_fn_call_expr(&mut self, expr: &FnCallExpr) -> FlowControl {
 		self.visit_ident_expr(&expr.ident);
 		self.result
-			.entry(expr.ident.name)
+			.entry(expr.ident.name.clone())
 			// If `visit_ident_expr` didn't register a token for this, it means it couldn't
 			// find a declaration in scope for the identifier -- that means it's either
 			// invalid or a built-in function, so we'll assume the latter.
@@ -106,7 +109,7 @@ impl<'a> Visitor<'a> for SemanticTokensBuilder<'a> {
 		FlowControl::Break
 	}
 
-	fn visit_postfix_expr(&mut self, expr: &'a PostfixExpr<'a>) -> FlowControl {
+	fn visit_postfix_expr(&mut self, expr: &PostfixExpr) -> FlowControl {
 		// A bracketed postfix ident will be correctly handled by `visit_ident_expr`.
 		if matches!(expr.accessor, Accessor::Index(_)) {
 			return FlowControl::Continue;
@@ -119,14 +122,14 @@ impl<'a> Visitor<'a> for SemanticTokensBuilder<'a> {
 		if let Expr::Primary(ref inner) = expr.expr.as_ref() {
 			if let Expr::Ident(ref inner) = inner.expr.as_ref() {
 				self.result
-					.insert(inner.name, (TokenType::Property, TokenMod::NONE));
+					.insert(inner.name.clone(), (TokenType::Property, TokenMod::NONE));
 			}
 		}
 
 		FlowControl::Continue
 	}
 
-	fn visit_ident_expr(&mut self, expr: &'a IdentExpr<'a>) {
+	fn visit_ident_expr(&mut self, expr: &IdentExpr) {
 		// Avoid overwriting our work if one of the previous special-case handlers already
 		// handled this expression.
 		if self.result.contains_key(&expr.name) {
@@ -137,10 +140,10 @@ impl<'a> Visitor<'a> for SemanticTokensBuilder<'a> {
 		// dependency's source document.
 		if let Some(ref namespace) = expr.namespace {
 			self.result
-				.insert(*namespace, (TokenType::Namespace, TokenMod::NONE));
+				.insert(namespace.clone(), (TokenType::Namespace, TokenMod::NONE));
 
-			let name = expr.name;
-			if let Some(document) = self.deps.get(namespace.lexeme()) {
+			let name = &expr.name;
+			if let Some(document) = self.deps.get(&namespace.lexeme()) {
 				if let Some(decl) = document
 					.ast
 					.inner
@@ -155,12 +158,12 @@ impl<'a> Visitor<'a> for SemanticTokensBuilder<'a> {
 						_ => unreachable!(),
 					};
 
-					self.result.insert(name, (ttype, TokenMod::NONE));
+					self.result.insert(name.clone(), (ttype, TokenMod::NONE));
 				}
 			}
 		}
 		// Otherwise, try looking up the declaration in the document's scope tree.
-		else if let token @ Token::Ident(_, _) = expr.name {
+		else if let ref token @ Token::Ident(_, _) = expr.name {
 			let sem_tok = self
 				.scopes
 				.find_decl(token)
@@ -170,19 +173,17 @@ impl<'a> Visitor<'a> for SemanticTokensBuilder<'a> {
 					Decl::Function(_) => (TokenType::Function, TokenMod::NONE),
 					Decl::Var(_) => (TokenType::Variable, TokenMod::NONE),
 					Decl::Const(_) => (TokenType::Variable, TokenMod::READONLY),
-					Decl::Field(_) => unreachable!(),
 					Decl::Param(_) => (TokenType::Parameter, TokenMod::NONE),
 					Decl::Extension(_) => (TokenType::Namespace, TokenMod::NONE),
 					Decl::Module(_) => (TokenType::Namespace, TokenMod::NONE),
+					// Field declarations are not directly represented in the scope tree
+					Decl::Field(_) => unreachable!(),
 				});
 
 			if let Some((ttype, tmod)) = sem_tok {
-				self.result.insert(token, (ttype, tmod));
+				self.result.insert(token.clone(), (ttype, tmod));
 			}
-		}
-		// I'm pretty sure this block is only actually handling primitive types via the
-		// `Type` token right now. See the TODO note in `parser_v2::tokens`.
-		else {
+		} else {
 			let sem_tok = match expr.name {
 				Token::Type(_, _) => Some((TokenType::Type, TokenMod::BUILTIN)),
 				Token::Attribute(_, _) => Some((TokenType::Macro, TokenMod::NONE)),
@@ -192,7 +193,7 @@ impl<'a> Visitor<'a> for SemanticTokensBuilder<'a> {
 			};
 
 			if let Some((ttype, tmod)) = sem_tok {
-				self.result.insert(expr.name, (ttype, tmod));
+				self.result.insert(expr.name.clone(), (ttype, tmod));
 			}
 		}
 	}

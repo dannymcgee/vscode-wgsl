@@ -10,7 +10,7 @@ use parser_v2::utils::ToRange;
 use serde_json as json;
 
 use super::references;
-use crate::documents_v2::Documents;
+use crate::documents::Documents;
 
 pub fn handle(id: RequestId, params: CodeLensParams, docs: &Documents) -> Message {
 	let result = get_lenses(&params, docs).unwrap_or_else(Vec::new);
@@ -41,7 +41,7 @@ fn get_lenses(params: &CodeLensParams, docs: &Documents) -> Option<Vec<CodeLens>
 			let title = if refs.len() == 1 {
 				"1 Reference".to_string()
 			} else {
-				format!("{} References", refs.len())
+				std::format!("{} References", refs.len())
 			};
 
 			let cmd_params = ReferenceParams {

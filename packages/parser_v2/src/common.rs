@@ -1,4 +1,4 @@
-use gramatika::{Parse, ParseStreamer, Span, Spanned, SpannedError};
+use gramatika::{Parse, ParseStreamer, Span, Spanned, SpannedError, Token as _};
 
 use crate::{
 	expr::{Expr, IdentExpr},
@@ -6,61 +6,63 @@ use crate::{
 };
 
 #[derive(Clone, DebugLisp)]
-pub struct AttributeList<'a> {
-	pub open_brace: Token<'a>,
-	pub attributes: Vec<Attribute<'a>>,
-	pub close_brace: Token<'a>,
+pub struct AttributeList {
+	pub open_brace: Token,
+	pub attributes: Vec<Attribute>,
+	pub close_brace: Token,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct Attribute<'a> {
-	pub name: Token<'a>,
-	pub value: Option<Token<'a>>,
+pub struct Attribute {
+	pub name: Token,
+	pub value: Option<Token>,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct TypeDecl<'a> {
-	pub annotator: Option<Token<'a>>,
-	pub attributes: Option<AttributeList<'a>>,
-	pub name: IdentExpr<'a>,
-	pub child_ty: Option<Token<'a>>,
-	pub storage_class: Option<Token<'a>>,
-	pub access_mode: Option<Token<'a>>,
+pub struct TypeDecl {
+	pub annotator: Option<Token>,
+	pub attributes: Option<AttributeList>,
+	pub name: IdentExpr,
+	pub child_ty: Option<Token>,
+	pub storage_class: Option<Token>,
+	pub access_mode: Option<Token>,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct ArgumentList<'a> {
-	pub brace_open: Token<'a>,
-	pub arguments: Vec<Expr<'a>>,
-	pub brace_close: Token<'a>,
+pub struct ArgumentList {
+	pub brace_open: Token,
+	pub arguments: Vec<Expr>,
+	pub brace_close: Token,
 }
 
-impl<'a> Spanned for AttributeList<'a> {
+impl Spanned for AttributeList {
 	fn span(&self) -> Span {
 		self.open_brace.span().through(self.close_brace.span())
 	}
 }
 
-impl<'a> Parse<'a> for AttributeList<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for AttributeList {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
-		use Token::*;
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
+		use TokenKind::*;
 
 		let open_brace = input.consume(brace!["[["])?;
 
 		let mut attributes = vec![];
 		while !input.check(brace!["]]"]) {
 			match input.peek() {
-				Some(Ident(_, _)) => attributes.push(input.parse()?),
-				Some(Punct(",", _)) => input.discard(),
-				Some(other) => {
-					return Err(SpannedError {
-						message: "Expected attribute, `,`, or `]]`".into(),
-						span: Some(other.span()),
-						source: input.source(),
-					})
-				}
+				Some(token) => match token.as_matchable() {
+					(Ident, _, _) => attributes.push(input.parse()?),
+					(Punct, ",", _) => input.discard(),
+					(_, _, span) => {
+						return Err(SpannedError {
+							message: "Expected attribute, `,`, or `]]`".into(),
+							span: Some(span),
+							source: input.source(),
+						})
+					}
+				},
 				None => {
 					return Err(SpannedError {
 						message: "Unexpected end of input".into(),
@@ -81,9 +83,9 @@ impl<'a> Parse<'a> for AttributeList<'a> {
 	}
 }
 
-impl<'a> Spanned for Attribute<'a> {
+impl Spanned for Attribute {
 	fn span(&self) -> Span {
-		if let Some(value) = self.value {
+		if let Some(ref value) = self.value {
 			self.name.span().through(value.span())
 		} else {
 			self.name.span()
@@ -91,10 +93,10 @@ impl<'a> Spanned for Attribute<'a> {
 	}
 }
 
-impl<'a> Parse<'a> for Attribute<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for Attribute {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
 		// TODO - see note in `tokens`
 		let name = input.consume_as(TokenKind::Ident, Token::attribute)?;
 		let value = if input.check(brace!["("]) {
@@ -116,44 +118,44 @@ impl<'a> Parse<'a> for Attribute<'a> {
 }
 
 #[derive(Default)]
-struct TypeDeclBuilder<'a> {
-	attributes: Option<AttributeList<'a>>,
-	annotator: Option<Token<'a>>,
-	name: Option<IdentExpr<'a>>,
-	child_ty: Option<Token<'a>>,
-	storage_class: Option<Token<'a>>,
-	access_mode: Option<Token<'a>>,
+struct TypeDeclBuilder {
+	attributes: Option<AttributeList>,
+	annotator: Option<Token>,
+	name: Option<IdentExpr>,
+	child_ty: Option<Token>,
+	storage_class: Option<Token>,
+	access_mode: Option<Token>,
 }
 
-impl<'a> TypeDeclBuilder<'a> {
+impl TypeDeclBuilder {
 	fn new() -> Self {
 		Self::default()
 	}
-	fn attributes(&mut self, attributes: AttributeList<'a>) -> &mut Self {
+	fn attributes(&mut self, attributes: AttributeList) -> &mut Self {
 		self.attributes = Some(attributes);
 		self
 	}
-	fn annotator(&mut self, colon: Token<'a>) -> &mut Self {
+	fn annotator(&mut self, colon: Token) -> &mut Self {
 		self.annotator = Some(colon);
 		self
 	}
-	fn name(&mut self, name: IdentExpr<'a>) -> &mut Self {
+	fn name(&mut self, name: IdentExpr) -> &mut Self {
 		self.name = Some(name);
 		self
 	}
-	fn child_ty(&mut self, child_ty: Token<'a>) -> &mut Self {
+	fn child_ty(&mut self, child_ty: Token) -> &mut Self {
 		self.child_ty = Some(child_ty);
 		self
 	}
-	fn storage_class(&mut self, storage_class: Token<'a>) -> &mut Self {
+	fn storage_class(&mut self, storage_class: Token) -> &mut Self {
 		self.storage_class = Some(storage_class);
 		self
 	}
-	fn access_mode(&mut self, access_mode: Token<'a>) -> &mut Self {
+	fn access_mode(&mut self, access_mode: Token) -> &mut Self {
 		self.access_mode = Some(access_mode);
 		self
 	}
-	fn build(self) -> TypeDecl<'a> {
+	fn build(self) -> TypeDecl {
 		TypeDecl {
 			annotator: self.annotator,
 			attributes: self.attributes,
@@ -165,30 +167,32 @@ impl<'a> TypeDeclBuilder<'a> {
 	}
 }
 
-impl<'a> Spanned for TypeDecl<'a> {
+impl Spanned for TypeDecl {
 	fn span(&self) -> Span {
 		let first = self
 			.annotator
+			.as_ref()
 			.map(|token| token.span())
 			.or_else(|| self.attributes.as_ref().map(|attr| attr.span()))
 			.unwrap_or_else(|| self.name.span());
 
 		let last = self
 			.access_mode
+			.as_ref()
 			.map(|token| token.span())
-			.or_else(|| self.storage_class.map(|token| token.span()))
-			.or_else(|| self.child_ty.map(|token| token.span()))
+			.or_else(|| self.storage_class.as_ref().map(|token| token.span()))
+			.or_else(|| self.child_ty.as_ref().map(|token| token.span()))
 			.unwrap_or_else(|| self.name.span());
 
 		first.through(last)
 	}
 }
 
-impl<'a> Parse<'a> for TypeDecl<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for TypeDecl {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
-		use Token::*;
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
+		use TokenKind::*;
 		let mut builder = TypeDeclBuilder::new();
 
 		if input.check(punct![:]) || input.check(operator![->]) {
@@ -209,23 +213,25 @@ impl<'a> Parse<'a> for TypeDecl<'a> {
 				while !input.check(operator![>]) {
 					#[rustfmt::skip]
 					match input.next() {
-						Some(token @ Type(_, _) | token @ Ident(_, _)) => {
-							builder.child_ty(token);
-						}
-						Some(token @ Keyword("function" | "private" | "workgroup" | "uniform" | "storage", _)) => {
-							builder.storage_class(token);
-						}
-						Some(token @ Keyword("read" | "write" | "read_write", _)) => {
-							builder.access_mode(token);
-						}
-						Some(Punct(",", _)) => {},
-						Some(other) => {
-							return Err(SpannedError {
-								message: "Expected type, storage class, access mode, or texel format"
-									.into(),
-								source: input.source(),
-								span: Some(other.span()),
-							})
+						Some(token) => match token.as_matchable() {
+							(Type | Ident, _, _) => {
+								builder.child_ty(token);
+							}
+							(Keyword, "function" | "private" | "workgroup" | "uniform" | "storage", _) => {
+								builder.storage_class(token);
+							}
+							(Keyword, "read" | "write" | "read_write", _) => {
+								builder.access_mode(token);
+							}
+							(Punct, ",", _) => {},
+							(_, _, span) => {
+								return Err(SpannedError {
+									message: "Expected type, storage class, access mode, or texel format"
+										.into(),
+									source: input.source(),
+									span: Some(span),
+								})
+							}
 						}
 						None => {
 							return Err(SpannedError {
@@ -247,17 +253,17 @@ impl<'a> Parse<'a> for TypeDecl<'a> {
 	}
 }
 
-impl<'a> Parse<'a> for ArgumentList<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for ArgumentList {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
 		use Token::*;
 
 		let brace_open = input.consume(brace!["("])?;
 		let mut arguments = vec![];
 		while !input.check(brace![")"]) {
 			match input.peek() {
-				Some(Punct(",", _)) => input.discard(),
+				Some(Punct(lex, _)) if lex == "," => input.discard(),
 				Some(_) => arguments.push(input.parse::<Expr>()?),
 				None => {
 					return Err(SpannedError {

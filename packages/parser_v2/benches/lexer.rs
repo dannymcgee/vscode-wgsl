@@ -21,7 +21,7 @@ pub fn lexer(c: &mut Criterion) {
 		let name = BenchmarkId::new("Lexer", key);
 
 		group.bench_with_input(name, program, move |b, input| {
-			b.iter_with_large_drop(|| Lexer::new(input).scan())
+			b.iter_with_large_drop(|| Lexer::new(input.into()).scan())
 		});
 	}
 

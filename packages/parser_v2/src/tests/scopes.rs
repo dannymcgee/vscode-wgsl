@@ -9,8 +9,8 @@ fn scopes() {
 	let tree = ParseStream::from(PROGRAM).parse::<SyntaxTree>().unwrap();
 	let root = scopes::build(&tree);
 
-	let test_token = Token::Ident("ambient_strength", span![77:35...77:51]);
-	if let Some(found) = root.find_decl(test_token) {
+	let test_token = Token::Ident(literal_substr!("ambient_strength"), span![77:35...77:51]);
+	if let Some(found) = root.find_decl(&test_token) {
 		eprintln!("{:#?}", found.as_ref());
 	} else {
 		panic!();

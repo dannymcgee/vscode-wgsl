@@ -10,14 +10,14 @@ use crate::{
 
 use super::SyntaxNode;
 
-pub fn find_parent<'a>(tree: &'a SyntaxTree<'a>, target: Span) -> Option<SyntaxNode<'a>> {
+pub fn find_parent(tree: &SyntaxTree, target: Span) -> Option<SyntaxNode> {
 	let mut finder = ParentFinder::new(target);
 	tree.walk(&mut finder);
 
 	finder.parents.pop()
 }
 
-pub fn find_parents<'a>(tree: &'a SyntaxTree<'a>, target: Span) -> Vec<SyntaxNode<'a>> {
+pub fn find_parents(tree: &SyntaxTree, target: Span) -> Vec<SyntaxNode> {
 	let mut finder = ParentFinder::new(target);
 	tree.walk(&mut finder);
 
@@ -25,12 +25,12 @@ pub fn find_parents<'a>(tree: &'a SyntaxTree<'a>, target: Span) -> Vec<SyntaxNod
 	finder.parents
 }
 
-struct ParentFinder<'a> {
+struct ParentFinder {
 	target: Span,
-	parents: Vec<SyntaxNode<'a>>,
+	parents: Vec<SyntaxNode>,
 }
 
-impl<'a> ParentFinder<'a> {
+impl ParentFinder {
 	fn new(target: Span) -> Self {
 		Self {
 			target,
@@ -39,8 +39,8 @@ impl<'a> ParentFinder<'a> {
 	}
 }
 
-impl<'a> Visitor<'a> for ParentFinder<'a> {
-	fn visit_decl(&mut self, decl: &'a Decl<'a>) -> FlowControl {
+impl Visitor for ParentFinder {
+	fn visit_decl(&mut self, decl: &Decl) -> FlowControl {
 		if decl.span().contains(self.target) {
 			self.parents.push(SyntaxNode::Decl(decl.clone()));
 
@@ -50,7 +50,7 @@ impl<'a> Visitor<'a> for ParentFinder<'a> {
 		}
 	}
 
-	fn visit_stmt(&mut self, stmt: &'a Stmt<'a>) -> FlowControl {
+	fn visit_stmt(&mut self, stmt: &Stmt) -> FlowControl {
 		if stmt.span().contains(self.target) {
 			self.parents.push(SyntaxNode::Stmt(stmt.clone()));
 
@@ -60,7 +60,7 @@ impl<'a> Visitor<'a> for ParentFinder<'a> {
 		}
 	}
 
-	fn visit_expr(&mut self, expr: &'a Expr<'a>) -> FlowControl {
+	fn visit_expr(&mut self, expr: &Expr) -> FlowControl {
 		if expr.span().contains(self.target) {
 			self.parents.push(SyntaxNode::Expr(expr.clone()));
 

@@ -3,6 +3,7 @@ use std::sync::Arc;
 use dashmap::DashMap;
 use gramatika::Spanned;
 use itertools::Itertools;
+use lazy_static::lazy_static;
 use lsp_server::{Message, RequestId, Response};
 use lsp_types::{
 	DocumentSymbol, DocumentSymbolParams, DocumentSymbolResponse, Range, SymbolKind, SymbolTag, Url,
@@ -14,7 +15,7 @@ use parser_v2::{
 };
 use serde_json as json;
 
-use crate::documents_v2::Documents;
+use crate::documents::Documents;
 
 lazy_static! {
 	static ref CACHE: Arc<DashMap<Url, Arc<DocumentSymbolResponse>>> = Arc::new(DashMap::default());
@@ -57,7 +58,7 @@ trait Detail {
 	fn detail(&self) -> Option<String>;
 }
 
-impl<'a> IntoSymbols for Arc<SyntaxTree<'a>> {
+impl IntoSymbols for Arc<SyntaxTree> {
 	fn into_symbols(self) -> Vec<DocumentSymbol> {
 		self.inner
 			.iter()
@@ -66,7 +67,7 @@ impl<'a> IntoSymbols for Arc<SyntaxTree<'a>> {
 	}
 }
 
-impl<'a> IntoSymbols for Arc<Vec<Decl<'a>>> {
+impl IntoSymbols for Arc<Vec<Decl>> {
 	fn into_symbols(self) -> Vec<DocumentSymbol> {
 		Arc::clone(&self)
 			.iter()
@@ -75,13 +76,13 @@ impl<'a> IntoSymbols for Arc<Vec<Decl<'a>>> {
 	}
 }
 
-impl<'a> AsSymbol for Decl<'a> {
+impl AsSymbol for Decl {
 	fn as_symbol(&self) -> Option<DocumentSymbol> {
 		use Decl::*;
 
 		let ident = self.name();
 		let builder = DocSymBuilder::new()
-			.name(ident)
+			.name(&ident)
 			.range(self.span().to_range())
 			.selection_range(ident.span().to_range());
 
@@ -122,7 +123,7 @@ impl<'a> AsSymbol for Decl<'a> {
 	}
 }
 
-impl<'a> IntoSymbols for &Vec<FieldDecl<'a>> {
+impl IntoSymbols for &Vec<FieldDecl> {
 	fn into_symbols(self) -> Vec<DocumentSymbol> {
 		self.iter()
 			.map(|field| {
@@ -138,7 +139,7 @@ impl<'a> IntoSymbols for &Vec<FieldDecl<'a>> {
 	}
 }
 
-impl<'a> IntoSymbols for &StructBody<'a> {
+impl IntoSymbols for &StructBody {
 	fn into_symbols(self) -> Vec<DocumentSymbol> {
 		self.fields
 			.iter()
@@ -160,11 +161,11 @@ impl<'a> IntoSymbols for &StructBody<'a> {
 	}
 }
 
-impl<'a> Detail for &VarDecl<'a> {
+impl Detail for &VarDecl {
 	fn detail(&self) -> Option<String> {
 		let attr_detail = self.attributes.as_ref();
 		let type_detail = self.ty.as_ref().map(|ty| ty.to_string());
-		let combine = |a, b| format!("{} {}", a, b);
+		let combine = |a, b| std::format!("{} {}", a, b);
 
 		attr_detail
 			.and_then(|attr| type_detail.as_ref().map(|ty| combine(attr, ty)))
@@ -172,7 +173,7 @@ impl<'a> Detail for &VarDecl<'a> {
 	}
 }
 
-impl<'a> Detail for &StructDecl<'a> {
+impl Detail for &StructDecl {
 	fn detail(&self) -> Option<String> {
 		self.attributes
 			.as_ref()
@@ -180,23 +181,23 @@ impl<'a> Detail for &StructDecl<'a> {
 	}
 }
 
-impl<'a> Detail for &FieldDecl<'a> {
+impl Detail for &FieldDecl {
 	fn detail(&self) -> Option<String> {
 		self.attributes
 			.as_ref()
-			.map(|attr| format!("{} {}", attr, self.ty))
+			.map(|attr| std::format!("{} {}", attr, self.ty))
 			.or_else(|| Some(self.ty.to_string()))
 	}
 }
 
-impl<'a> Detail for &FunctionDecl<'a> {
+impl Detail for &FunctionDecl {
 	fn detail(&self) -> Option<String> {
 		let params = self
 			.params
 			.iter()
 			.map(|param| {
 				if let Decl::Param(param) = param {
-					format!("{}: {}", param.name, param.ty)
+					std::format!("{}: {}", param.name, param.ty)
 				} else {
 					unreachable!()
 				}
@@ -204,16 +205,16 @@ impl<'a> Detail for &FunctionDecl<'a> {
 			.join(", ");
 
 		let return_ty = if let Some(return_ty) = self.return_ty.as_ref() {
-			format!(" -> {}", return_ty)
+			std::format!(" -> {}", return_ty)
 		} else {
 			"".into()
 		};
 
-		let sig_detail = format!("fn ({}){}", params, return_ty);
+		let sig_detail = std::format!("fn ({}){}", params, return_ty);
 
 		self.attributes
 			.as_ref()
-			.map(|attr| format!("{} {}", attr, sig_detail))
+			.map(|attr| std::format!("{} {}", attr, sig_detail))
 			.or(Some(sig_detail))
 	}
 }

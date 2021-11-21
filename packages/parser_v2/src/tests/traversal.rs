@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use gramatika::{ParseStreamer, Token as _};
+use gramatika::{ParseStreamer, Substr, Token as _};
 
 use crate::{
 	decl::VarDecl,
@@ -10,18 +10,18 @@ use crate::{
 };
 
 #[derive(Default)]
-struct UnusedVarsVisitor<'a> {
-	counts: HashMap<&'a str, usize>,
+struct UnusedVarsVisitor {
+	counts: HashMap<Substr, usize>,
 }
 
-impl<'a> UnusedVarsVisitor<'a> {
+impl UnusedVarsVisitor {
 	fn new() -> Self {
 		Self::default()
 	}
 }
 
-impl<'a> Visitor<'a> for UnusedVarsVisitor<'a> {
-	fn visit_var_decl(&mut self, decl: &'a VarDecl<'a>) -> FlowControl {
+impl Visitor for UnusedVarsVisitor {
+	fn visit_var_decl(&mut self, decl: &VarDecl) -> FlowControl {
 		self.counts.insert(decl.name.lexeme(), 0);
 
 		if let Some(ref expr) = decl.assignment {
@@ -31,8 +31,8 @@ impl<'a> Visitor<'a> for UnusedVarsVisitor<'a> {
 		FlowControl::Break
 	}
 
-	fn visit_ident_expr(&mut self, expr: &'a IdentExpr<'a>) {
-		if let Some(count) = self.counts.get_mut(expr.name.lexeme()) {
+	fn visit_ident_expr(&mut self, expr: &IdentExpr) {
+		if let Some(count) = self.counts.get_mut(&expr.name.lexeme()) {
 			*count += 1;
 		}
 	}

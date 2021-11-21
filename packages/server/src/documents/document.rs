@@ -1,27 +1,32 @@
 use std::{collections::HashMap, sync::Arc};
 
+use gramatika::{ArcStr, Substr};
 use lsp_types::{DidChangeTextDocumentParams as UpdateParams, Url};
 use parking_lot::RwLock;
-use parser_v2::{scopes::Scope, SyntaxTree, Token};
+use parser_v2::{
+	scopes::{self, Scope},
+	SyntaxTree, Token,
+};
 use ropey::Rope;
 
-use super::Status;
+use super::{DependencyResolver, Status};
 
-pub struct Document<'a> {
-	pub uri: Url,
-	pub source: String,
-	pub tokens: Vec<Token<'a>>,
-	pub ast: Arc<SyntaxTree<'a>>,
-	pub deps: Arc<HashMap<&'a str, Url>>,
-	pub scopes: Arc<Scope<'a>>,
+pub struct Document {
+	pub uri: Arc<Url>,
+	pub source: ArcStr,
+	pub tokens: Arc<[Token]>,
+	pub ast: Arc<SyntaxTree>,
+	pub deps: Arc<HashMap<Substr, Url>>,
+	pub scopes: Arc<Scope>,
 	pub(super) rope: Arc<RwLock<Rope>>,
 	pub(super) status: Status,
 }
 
-impl<'a> Document<'a> {
-	pub(super) fn new(text: String, uri: Url) -> parser_v2::Result<'a, Self> {
+impl Document {
+	pub(super) fn new(text: String, uri: Url) -> parser_v2::Result<Self> {
 		let (ast, source, tokens) = super::parse(text)?;
-		let (scopes, deps) = super::build_scope_tree(&ast, &uri);
+		let scopes = scopes::build(&ast);
+		let deps = DependencyResolver::resolve(&ast, &uri);
 
 		let status = if deps.is_empty() {
 			Status::Ready
@@ -32,9 +37,9 @@ impl<'a> Document<'a> {
 		let rope = Arc::new(RwLock::new(Rope::from_str(&source)));
 
 		Ok(Self {
-			uri,
+			uri: Arc::new(uri),
 			source,
-			tokens,
+			tokens: tokens.into(),
 			ast: Arc::new(ast),
 			deps,
 			scopes,
@@ -62,12 +67,10 @@ impl<'a> Document<'a> {
 
 		let (ast, source, tokens) = super::parse(source.to_string())?;
 		self.source = source;
-		self.tokens = tokens;
-
-		let (scopes, deps) = super::build_scope_tree(&ast, &self.uri);
+		self.tokens = tokens.into();
+		self.deps = DependencyResolver::resolve(&ast, &self.uri);
+		self.scopes = scopes::build(&ast);
 		self.ast = Arc::new(ast);
-		self.deps = deps;
-		self.scopes = scopes;
 
 		self.status = if self.deps.is_empty() {
 			Status::Ready
@@ -76,5 +79,20 @@ impl<'a> Document<'a> {
 		};
 
 		Ok(())
+	}
+}
+
+impl Clone for Document {
+	fn clone(&self) -> Self {
+		Self {
+			uri: Arc::clone(&self.uri),
+			source: ArcStr::clone(&self.source),
+			tokens: Arc::clone(&self.tokens),
+			ast: Arc::clone(&self.ast),
+			deps: Arc::clone(&self.deps),
+			scopes: Arc::clone(&self.scopes),
+			rope: Arc::clone(&self.rope),
+			status: self.status,
+		}
 	}
 }

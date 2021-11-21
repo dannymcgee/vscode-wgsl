@@ -61,231 +61,231 @@ pub fn traversal(c: &mut Criterion) {
 	}
 }
 
-impl<'a> Visitor<'a> for NodeCountVisitor {
-	fn visit_decl(&mut self, decl: &'a Decl<'a>) -> FlowControl {
+impl Visitor for NodeCountVisitor {
+	fn visit_decl(&mut self, decl: &Decl) -> FlowControl {
 		criterion::black_box(decl);
 		self.count += 1;
 
 		Continue
 	}
 
-	fn visit_stmt(&mut self, stmt: &'a Stmt<'a>) -> FlowControl {
+	fn visit_stmt(&mut self, stmt: &Stmt) -> FlowControl {
 		criterion::black_box(stmt);
 		self.count += 1;
 
 		Continue
 	}
 
-	fn visit_expr(&mut self, expr: &'a Expr<'a>) -> FlowControl {
+	fn visit_expr(&mut self, expr: &Expr) -> FlowControl {
 		criterion::black_box(expr);
 		self.count += 1;
 
 		Continue
 	}
 
-	fn visit_type(&mut self, decl: &'a TypeDecl<'a>) -> FlowControl {
+	fn visit_type(&mut self, decl: &TypeDecl) -> FlowControl {
 		criterion::black_box(decl);
 		self.count += 1;
 
 		Continue
 	}
 
-	fn visit_attributes(&mut self, attr: &'a AttributeList<'a>) {
+	fn visit_attributes(&mut self, attr: &AttributeList) {
 		criterion::black_box(attr);
 		self.count += 1;
 	}
 
-	fn visit_var_decl(&mut self, decl: &'a VarDecl<'a>) -> FlowControl {
+	fn visit_var_decl(&mut self, decl: &VarDecl) -> FlowControl {
 		criterion::black_box(decl);
 		self.count += 1;
 
 		Continue
 	}
 
-	fn visit_type_alias_decl(&mut self, decl: &'a TypeAliasDecl<'a>) -> FlowControl {
+	fn visit_type_alias_decl(&mut self, decl: &TypeAliasDecl) -> FlowControl {
 		criterion::black_box(decl);
 		self.count += 1;
 
 		Continue
 	}
 
-	fn visit_struct_decl(&mut self, decl: &'a StructDecl<'a>) -> FlowControl {
+	fn visit_struct_decl(&mut self, decl: &StructDecl) -> FlowControl {
 		criterion::black_box(decl);
 		self.count += 1;
 
 		Continue
 	}
 
-	fn visit_field_decl(&mut self, decl: &'a FieldDecl<'a>) -> FlowControl {
+	fn visit_field_decl(&mut self, decl: &FieldDecl) -> FlowControl {
 		criterion::black_box(decl);
 		self.count += 1;
 
 		Continue
 	}
 
-	fn visit_func_decl(&mut self, decl: &'a FunctionDecl<'a>) -> FlowControl {
+	fn visit_func_decl(&mut self, decl: &FunctionDecl) -> FlowControl {
 		criterion::black_box(decl);
 		self.count += 1;
 
 		Continue
 	}
 
-	fn visit_param_decl(&mut self, decl: &'a ParamDecl<'a>) -> FlowControl {
+	fn visit_param_decl(&mut self, decl: &ParamDecl) -> FlowControl {
 		criterion::black_box(decl);
 		self.count += 1;
 
 		Continue
 	}
 
-	fn visit_extension_decl(&mut self, decl: &'a ExtensionDecl<'a>) {
+	fn visit_extension_decl(&mut self, decl: &ExtensionDecl) {
 		criterion::black_box(decl);
 		self.count += 1;
 	}
 
-	fn visit_module_decl(&mut self, decl: &'a ModuleDecl<'a>) {
+	fn visit_module_decl(&mut self, decl: &ModuleDecl) {
 		criterion::black_box(decl);
 		self.count += 1;
 	}
 
-	fn visit_return_stmt(&mut self, stmt: &'a ReturnStmt<'a>) -> FlowControl {
+	fn visit_return_stmt(&mut self, stmt: &ReturnStmt) -> FlowControl {
 		criterion::black_box(stmt);
 		self.count += 1;
 
 		Continue
 	}
 
-	fn visit_if_stmt(&mut self, stmt: &'a IfStmt<'a>) -> FlowControl {
+	fn visit_if_stmt(&mut self, stmt: &IfStmt) -> FlowControl {
 		criterion::black_box(stmt);
 		self.count += 1;
 
 		Continue
 	}
 
-	fn visit_elseif_stmt(&mut self, stmt: &'a IfStmt<'a>) -> FlowControl {
+	fn visit_elseif_stmt(&mut self, stmt: &IfStmt) -> FlowControl {
 		criterion::black_box(stmt);
 		self.count += 1;
 
 		Continue
 	}
 
-	fn visit_else_stmt(&mut self, stmt: &'a ElseStmt<'a>) -> FlowControl {
+	fn visit_else_stmt(&mut self, stmt: &ElseStmt) -> FlowControl {
 		criterion::black_box(stmt);
 		self.count += 1;
 
 		Continue
 	}
 
-	fn visit_switch_stmt(&mut self, stmt: &'a SwitchStmt<'a>) -> FlowControl {
+	fn visit_switch_stmt(&mut self, stmt: &SwitchStmt) -> FlowControl {
 		criterion::black_box(stmt);
 		self.count += 1;
 
 		Continue
 	}
 
-	fn visit_case_stmt(&mut self, stmt: &'a CaseStmt<'a>) -> FlowControl {
+	fn visit_case_stmt(&mut self, stmt: &CaseStmt) -> FlowControl {
 		criterion::black_box(stmt);
 		self.count += 1;
 
 		Continue
 	}
 
-	fn visit_loop_stmt(&mut self, stmt: &'a LoopStmt<'a>) -> FlowControl {
+	fn visit_loop_stmt(&mut self, stmt: &LoopStmt) -> FlowControl {
 		criterion::black_box(stmt);
 		self.count += 1;
 
 		Continue
 	}
 
-	fn visit_continuing_stmt(&mut self, stmt: &'a ContinuingStmt<'a>) -> FlowControl {
+	fn visit_continuing_stmt(&mut self, stmt: &ContinuingStmt) -> FlowControl {
 		criterion::black_box(stmt);
 		self.count += 1;
 
 		Continue
 	}
 
-	fn visit_for_stmt(&mut self, stmt: &'a ForStmt<'a>) -> FlowControl {
+	fn visit_for_stmt(&mut self, stmt: &ForStmt) -> FlowControl {
 		criterion::black_box(stmt);
 		self.count += 1;
 
 		Continue
 	}
 
-	fn visit_expr_stmt(&mut self, stmt: &'a ExprStmt<'a>) -> FlowControl {
+	fn visit_expr_stmt(&mut self, stmt: &ExprStmt) -> FlowControl {
 		criterion::black_box(stmt);
 		self.count += 1;
 
 		Continue
 	}
 
-	fn visit_unary_expr(&mut self, expr: &'a UnaryExpr<'a>) -> FlowControl {
+	fn visit_unary_expr(&mut self, expr: &UnaryExpr) -> FlowControl {
 		criterion::black_box(expr);
 		self.count += 1;
 
 		Continue
 	}
 
-	fn visit_binary_expr(&mut self, expr: &'a BinaryExpr<'a>) -> FlowControl {
+	fn visit_binary_expr(&mut self, expr: &BinaryExpr) -> FlowControl {
 		criterion::black_box(expr);
 		self.count += 1;
 
 		Continue
 	}
 
-	fn visit_assignment_expr(&mut self, expr: &'a BinaryExpr<'a>) -> FlowControl {
+	fn visit_assignment_expr(&mut self, expr: &BinaryExpr) -> FlowControl {
 		criterion::black_box(expr);
 		self.count += 1;
 
 		Continue
 	}
 
-	fn visit_fn_call_expr(&mut self, expr: &'a FnCallExpr<'a>) -> FlowControl {
+	fn visit_fn_call_expr(&mut self, expr: &FnCallExpr) -> FlowControl {
 		criterion::black_box(expr);
 		self.count += 1;
 
 		Continue
 	}
 
-	fn visit_type_ctor_expr(&mut self, expr: &'a TypeCtorExpr<'a>) -> FlowControl {
+	fn visit_type_ctor_expr(&mut self, expr: &TypeCtorExpr) -> FlowControl {
 		criterion::black_box(expr);
 		self.count += 1;
 
 		Continue
 	}
 
-	fn visit_group_expr(&mut self, expr: &'a GroupExpr<'a>) -> FlowControl {
+	fn visit_group_expr(&mut self, expr: &GroupExpr) -> FlowControl {
 		criterion::black_box(expr);
 		self.count += 1;
 
 		Continue
 	}
 
-	fn visit_bitcast_expr(&mut self, expr: &'a BitcastExpr<'a>) -> FlowControl {
+	fn visit_bitcast_expr(&mut self, expr: &BitcastExpr) -> FlowControl {
 		criterion::black_box(expr);
 		self.count += 1;
 
 		Continue
 	}
 
-	fn visit_primary_expr(&mut self, expr: &'a PrimaryExpr<'a>) -> FlowControl {
+	fn visit_primary_expr(&mut self, expr: &PrimaryExpr) -> FlowControl {
 		criterion::black_box(expr);
 		self.count += 1;
 
 		Continue
 	}
 
-	fn visit_postfix_expr(&mut self, expr: &'a PostfixExpr<'a>) -> FlowControl {
+	fn visit_postfix_expr(&mut self, expr: &PostfixExpr) -> FlowControl {
 		criterion::black_box(expr);
 		self.count += 1;
 
 		Continue
 	}
 
-	fn visit_literal_expr(&mut self, expr: &'a Token<'a>) {
+	fn visit_literal_expr(&mut self, expr: &Token) {
 		criterion::black_box(expr);
 		self.count += 1;
 	}
 
-	fn visit_ident_expr(&mut self, expr: &'a IdentExpr<'a>) {
+	fn visit_ident_expr(&mut self, expr: &IdentExpr) {
 		criterion::black_box(expr);
 		self.count += 1;
 	}

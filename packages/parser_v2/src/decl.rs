@@ -1,4 +1,6 @@
-use gramatika::{Parse, ParseStreamer, Span, Spanned, SpannedError, Token as _};
+use std::sync::Arc;
+
+use gramatika::{Parse, ParseStreamer, Span, Spanned, SpannedError, Substr, Token as _};
 
 use crate::{
 	common::{AttributeList, TypeDecl},
@@ -8,111 +10,111 @@ use crate::{
 };
 
 #[derive(Clone, DebugLisp)]
-pub enum Decl<'a> {
-	Var(VarDecl<'a>),
-	Const(VarDecl<'a>),
-	TypeAlias(TypeAliasDecl<'a>),
-	Struct(StructDecl<'a>),
-	Field(FieldDecl<'a>),
-	Function(FunctionDecl<'a>),
-	Param(ParamDecl<'a>),
-	Extension(ExtensionDecl<'a>),
-	Module(ModuleDecl<'a>),
+pub enum Decl {
+	Var(VarDecl),
+	Const(VarDecl),
+	TypeAlias(TypeAliasDecl),
+	Struct(StructDecl),
+	Field(FieldDecl),
+	Function(FunctionDecl),
+	Param(ParamDecl),
+	Extension(ExtensionDecl),
+	Module(ModuleDecl),
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct VarDecl<'a> {
-	pub attributes: Option<AttributeList<'a>>,
-	pub storage: Token<'a>,
-	pub storage_qualifiers: Option<Vec<Token<'a>>>,
-	pub name: Token<'a>,
-	pub ty: Option<TypeDecl<'a>>,
-	pub assignment: Option<Expr<'a>>,
-	pub semicolon: Token<'a>,
+pub struct VarDecl {
+	pub attributes: Option<AttributeList>,
+	pub storage: Token,
+	pub storage_qualifiers: Option<Arc<[Token]>>,
+	pub name: Token,
+	pub ty: Option<TypeDecl>,
+	pub assignment: Option<Expr>,
+	pub semicolon: Token,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct TypeAliasDecl<'a> {
-	pub storage: Token<'a>,
-	pub name: Token<'a>,
-	pub eq: Token<'a>,
-	pub value: TypeDecl<'a>,
-	pub semicolon: Token<'a>,
+pub struct TypeAliasDecl {
+	pub storage: Token,
+	pub name: Token,
+	pub eq: Token,
+	pub value: TypeDecl,
+	pub semicolon: Token,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct StructDecl<'a> {
-	pub attributes: Option<AttributeList<'a>>,
-	pub storage: Token<'a>,
-	pub storage_modifier: Option<Token<'a>>,
-	pub name: Token<'a>,
-	pub body: StructBody<'a>,
-	pub semicolon: Token<'a>,
+pub struct StructDecl {
+	pub attributes: Option<AttributeList>,
+	pub storage: Token,
+	pub storage_modifier: Option<Token>,
+	pub name: Token,
+	pub body: StructBody,
+	pub semicolon: Token,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct StructBody<'a> {
-	pub open_brace: Token<'a>,
-	pub fields: Vec<Decl<'a>>,
-	pub close_brace: Token<'a>,
+pub struct StructBody {
+	pub open_brace: Token,
+	pub fields: Arc<[Decl]>,
+	pub close_brace: Token,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct FieldDecl<'a> {
-	pub attributes: Option<AttributeList<'a>>,
-	pub name: Token<'a>,
-	pub ty: TypeDecl<'a>,
-	pub semicolon: Token<'a>,
+pub struct FieldDecl {
+	pub attributes: Option<AttributeList>,
+	pub name: Token,
+	pub ty: TypeDecl,
+	pub semicolon: Token,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct FunctionDecl<'a> {
-	pub attributes: Option<AttributeList<'a>>,
-	pub storage: Token<'a>,
-	pub storage_modifier: Option<Token<'a>>,
-	pub name: Token<'a>,
-	pub params: Vec<Decl<'a>>,
-	pub return_ty: Option<TypeDecl<'a>>,
-	pub body: BlockStmt<'a>,
+pub struct FunctionDecl {
+	pub attributes: Option<AttributeList>,
+	pub storage: Token,
+	pub storage_modifier: Option<Token>,
+	pub name: Token,
+	pub params: Arc<[Decl]>,
+	pub return_ty: Option<TypeDecl>,
+	pub body: BlockStmt,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct ParamDecl<'a> {
-	pub attributes: Option<AttributeList<'a>>,
-	pub name: Token<'a>,
-	pub ty: TypeDecl<'a>,
+pub struct ParamDecl {
+	pub attributes: Option<AttributeList>,
+	pub name: Token,
+	pub ty: TypeDecl,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct ExtensionDecl<'a> {
-	pub keyword: Token<'a>,
-	pub name: Token<'a>,
+pub struct ExtensionDecl {
+	pub keyword: Token,
+	pub name: Token,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct ModuleDecl<'a> {
-	pub import_kw: Token<'a>,
-	pub name: Token<'a>,
-	pub from_kw: Token<'a>,
-	pub path: Token<'a>,
-	pub semicolon: Token<'a>,
+pub struct ModuleDecl {
+	pub import_kw: Token,
+	pub name: Token,
+	pub from_kw: Token,
+	pub path: Token,
+	pub semicolon: Token,
 }
 
-impl<'a> Decl<'a> {
-	pub fn name(&self) -> Token<'a> {
+impl Decl {
+	pub fn name(&self) -> &Token {
 		match self {
-			Decl::Var(decl) | Decl::Const(decl) => decl.name,
-			Decl::TypeAlias(decl) => decl.name,
-			Decl::Struct(decl) => decl.name,
-			Decl::Field(decl) => decl.name,
-			Decl::Function(decl) => decl.name,
-			Decl::Param(decl) => decl.name,
-			Decl::Extension(decl) => decl.name,
-			Decl::Module(decl) => decl.name,
+			Decl::Var(decl) | Decl::Const(decl) => &decl.name,
+			Decl::TypeAlias(decl) => &decl.name,
+			Decl::Struct(decl) => &decl.name,
+			Decl::Field(decl) => &decl.name,
+			Decl::Function(decl) => &decl.name,
+			Decl::Param(decl) => &decl.name,
+			Decl::Extension(decl) => &decl.name,
+			Decl::Module(decl) => &decl.name,
 		}
 	}
 
-	pub fn attributes(&self) -> Option<&AttributeList<'a>> {
+	pub fn attributes(&self) -> Option<&AttributeList> {
 		match self {
 			Decl::Var(decl) => decl.attributes.as_ref(),
 			Decl::Const(decl) => decl.attributes.as_ref(),
@@ -127,53 +129,55 @@ impl<'a> Decl<'a> {
 	}
 }
 
-impl<'a> Parse<'a> for Decl<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for Decl {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
-		use Token::*;
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
+		use TokenKind::*;
 
 		match input.peek() {
-			Some(Brace("[[", _)) => {
-				let attributes = Some(input.parse::<AttributeList>()?);
+			Some(token) => match token.as_matchable() {
+				(Brace, "[[", _) => {
+					let attributes = Some(input.parse::<AttributeList>()?);
 
-				match input.parse::<Decl>()? {
-					Decl::Var(mut inner) => {
-						inner.attributes = attributes;
-						Ok(Decl::Var(inner))
+					match input.parse::<Decl>()? {
+						Decl::Var(mut inner) => {
+							inner.attributes = attributes;
+							Ok(Decl::Var(inner))
+						}
+						Decl::Const(mut inner) => {
+							inner.attributes = attributes;
+							Ok(Decl::Const(inner))
+						}
+						Decl::Struct(mut inner) => {
+							inner.attributes = attributes;
+							Ok(Decl::Struct(inner))
+						}
+						Decl::Function(mut inner) => {
+							inner.attributes = attributes;
+							Ok(Decl::Function(inner))
+						}
+						_ => Err(SpannedError {
+							message: "Attributes are not valid in this position".into(),
+							span: Some(attributes.unwrap().span()),
+							source: input.source(),
+						}),
 					}
-					Decl::Const(mut inner) => {
-						inner.attributes = attributes;
-						Ok(Decl::Const(inner))
-					}
-					Decl::Struct(mut inner) => {
-						inner.attributes = attributes;
-						Ok(Decl::Struct(inner))
-					}
-					Decl::Function(mut inner) => {
-						inner.attributes = attributes;
-						Ok(Decl::Function(inner))
-					}
-					_ => Err(SpannedError {
-						message: "Attributes are not valid in this position".into(),
-						span: Some(attributes.unwrap().span()),
-						source: input.source(),
-					}),
 				}
-			}
-			Some(Keyword("var", _)) => Ok(Decl::Var(input.parse()?)),
-			Some(Keyword("let", _)) => Ok(Decl::Const(input.parse()?)),
-			Some(Keyword("type", _)) => Ok(Decl::TypeAlias(input.parse()?)),
-			Some(Keyword("struct", _)) => Ok(Decl::Struct(input.parse()?)),
-			Some(Keyword("fn", _)) => Ok(Decl::Function(input.parse()?)),
-			Some(Keyword("enable", _)) => Ok(Decl::Extension(input.parse()?)),
-			Some(Keyword("import", _)) => Ok(Decl::Module(input.parse()?)),
-			Some(other) => Err(SpannedError {
-				message: "Expected `var`, `let`, `type`, `struct`, `fn`, `enable`, or `import`"
-					.into(),
-				span: Some(other.span()),
-				source: input.source(),
-			}),
+				(Keyword, "var", _) => Ok(Decl::Var(input.parse()?)),
+				(Keyword, "let", _) => Ok(Decl::Const(input.parse()?)),
+				(Keyword, "type", _) => Ok(Decl::TypeAlias(input.parse()?)),
+				(Keyword, "struct", _) => Ok(Decl::Struct(input.parse()?)),
+				(Keyword, "fn", _) => Ok(Decl::Function(input.parse()?)),
+				(Keyword, "enable", _) => Ok(Decl::Extension(input.parse()?)),
+				(Keyword, "import", _) => Ok(Decl::Module(input.parse()?)),
+				(_, _, span) => Err(SpannedError {
+					message: "Expected `var`, `let`, `type`, `struct`, `fn`, `enable`, or `import`"
+						.into(),
+					span: Some(span),
+					source: input.source(),
+				}),
+			},
 			None => Err(SpannedError {
 				message: "Unexpected end of input".into(),
 				source: input.source(),
@@ -183,7 +187,7 @@ impl<'a> Parse<'a> for Decl<'a> {
 	}
 }
 
-impl<'a> Spanned for Decl<'a> {
+impl Spanned for Decl {
 	fn span(&self) -> Span {
 		use Decl::*;
 
@@ -201,12 +205,15 @@ impl<'a> Spanned for Decl<'a> {
 	}
 }
 
-impl<'a> Parse<'a> for VarDecl<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for VarDecl {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
 		let storage = input.consume_kind(TokenKind::Keyword)?;
-		assert!(matches!(storage, Token::Keyword("let" | "var", _)));
+		assert!(matches!(
+			storage.as_matchable(),
+			(TokenKind::Keyword, "let" | "var", _)
+		));
 
 		let storage_qualifiers = if input.check(operator![<]) {
 			input.consume(operator![<])?;
@@ -216,7 +223,7 @@ impl<'a> Parse<'a> for VarDecl<'a> {
 				qual.push(input.consume_kind(TokenKind::Keyword)?);
 			}
 			input.consume(operator![>])?;
-			Some(qual)
+			Some(qual.into())
 		} else {
 			None
 		};
@@ -250,16 +257,16 @@ impl<'a> Parse<'a> for VarDecl<'a> {
 	}
 }
 
-impl<'a> Spanned for VarDecl<'a> {
+impl Spanned for VarDecl {
 	fn span(&self) -> Span {
 		self.storage.span().through(self.semicolon.span())
 	}
 }
 
-impl<'a> Parse<'a> for TypeAliasDecl<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for TypeAliasDecl {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
 		let storage = input.consume(keyword![type])?;
 		let name = input.consume_kind(TokenKind::Ident)?;
 		let eq = input.consume(operator![=])?;
@@ -276,16 +283,16 @@ impl<'a> Parse<'a> for TypeAliasDecl<'a> {
 	}
 }
 
-impl<'a> Spanned for TypeAliasDecl<'a> {
+impl Spanned for TypeAliasDecl {
 	fn span(&self) -> Span {
 		self.storage.span().through(self.semicolon.span())
 	}
 }
 
-impl<'a> Parse<'a> for StructDecl<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for StructDecl {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
 		let storage = input.consume(keyword![struct])?;
 
 		let storage_modifier = if input.check(operator![<]) {
@@ -313,34 +320,36 @@ impl<'a> Parse<'a> for StructDecl<'a> {
 	}
 }
 
-impl<'a> Spanned for StructDecl<'a> {
+impl Spanned for StructDecl {
 	fn span(&self) -> Span {
 		self.storage.span().through(self.semicolon.span())
 	}
 }
 
-impl<'a> Parse<'a> for StructBody<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for StructBody {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
-		use Token::*;
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
+		use TokenKind::*;
 
 		let open_brace = input.consume(brace!["{"])?;
 
 		let mut fields = vec![];
 		while !input.check(brace!["}"]) {
 			match input.peek() {
-				Some(Brace("[[", _)) | Some(Ident(_, _)) => {
-					let field = input.parse::<FieldDecl>()?;
-					fields.push(Decl::Field(field));
-				}
-				Some(other) => {
-					return Err(SpannedError {
-						message: "Expected field declaration".into(),
-						span: Some(other.span()),
-						source: input.source(),
-					})
-				}
+				Some(token) => match token.as_matchable() {
+					(Brace, "[[", _) | (Ident, _, _) => {
+						let field = input.parse::<FieldDecl>()?;
+						fields.push(Decl::Field(field));
+					}
+					(_, _, span) => {
+						return Err(SpannedError {
+							message: "Expected field declaration".into(),
+							span: Some(span),
+							source: input.source(),
+						})
+					}
+				},
 				None => {
 					return Err(SpannedError {
 						message: "Unexpected end of input".into(),
@@ -355,22 +364,22 @@ impl<'a> Parse<'a> for StructBody<'a> {
 
 		Ok(Self {
 			open_brace,
-			fields,
+			fields: fields.into(),
 			close_brace,
 		})
 	}
 }
 
-impl<'a> Spanned for StructBody<'a> {
+impl Spanned for StructBody {
 	fn span(&self) -> Span {
 		self.open_brace.span().through(self.close_brace.span())
 	}
 }
 
-impl<'a> Parse<'a> for FieldDecl<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for FieldDecl {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
 		let attributes = if input.check(brace!["[["]) {
 			Some(input.parse::<AttributeList>()?)
 		} else {
@@ -389,24 +398,24 @@ impl<'a> Parse<'a> for FieldDecl<'a> {
 	}
 }
 
-impl<'a> Spanned for FieldDecl<'a> {
+impl Spanned for FieldDecl {
 	fn span(&self) -> Span {
 		let span_start = self
 			.attributes
 			.as_ref()
-			.map(|attr| attr.open_brace)
-			.unwrap_or(self.name)
+			.map(|attr| &attr.open_brace)
+			.unwrap_or(&self.name)
 			.span();
 
 		span_start.through(self.semicolon.span())
 	}
 }
 
-impl<'a> Parse<'a> for FunctionDecl<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for FunctionDecl {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
-		use Token::*;
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
+		use TokenKind::*;
 
 		let storage = input.consume(keyword![fn])?;
 		let storage_modifier = if input.check(operator![<]) {
@@ -424,18 +433,20 @@ impl<'a> Parse<'a> for FunctionDecl<'a> {
 		let mut params = vec![];
 		while !input.check(brace![")"]) {
 			match input.peek() {
-				Some(Brace("[[", _) | Ident(_, _)) => {
-					let param = input.parse::<ParamDecl>()?;
-					params.push(Decl::Param(param));
-				}
-				Some(Punct(",", _)) => input.discard(),
-				Some(other) => {
-					return Err(SpannedError {
-						message: "Expected parameter, `,`, or `)`".into(),
-						span: Some(other.span()),
-						source: input.source(),
-					})
-				}
+				Some(token) => match token.as_matchable() {
+					(Brace, "[[", _) | (Ident, _, _) => {
+						let param = input.parse::<ParamDecl>()?;
+						params.push(Decl::Param(param));
+					}
+					(Punct, ",", _) => input.discard(),
+					(_, _, span) => {
+						return Err(SpannedError {
+							message: "Expected parameter, `,`, or `)`".into(),
+							span: Some(span),
+							source: input.source(),
+						})
+					}
+				},
 				None => {
 					return Err(SpannedError {
 						message: "Unexpected end of input".into(),
@@ -460,23 +471,23 @@ impl<'a> Parse<'a> for FunctionDecl<'a> {
 			storage,
 			storage_modifier,
 			name,
-			params,
+			params: params.into(),
 			return_ty,
 			body,
 		})
 	}
 }
 
-impl<'a> Spanned for FunctionDecl<'a> {
+impl Spanned for FunctionDecl {
 	fn span(&self) -> Span {
 		self.storage.span().through(self.body.brace_close.span())
 	}
 }
 
-impl<'a> Parse<'a> for ParamDecl<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for ParamDecl {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
 		let attributes = if input.check(brace!["[["]) {
 			Some(input.parse::<AttributeList>()?)
 		} else {
@@ -493,23 +504,23 @@ impl<'a> Parse<'a> for ParamDecl<'a> {
 	}
 }
 
-impl<'a> Spanned for ParamDecl<'a> {
+impl Spanned for ParamDecl {
 	fn span(&self) -> Span {
 		let span_start = self
 			.attributes
 			.as_ref()
-			.map(|attr| attr.open_brace)
-			.unwrap_or(self.name)
+			.map(|attr| &attr.open_brace)
+			.unwrap_or(&self.name)
 			.span();
 
 		span_start.through(self.ty.span())
 	}
 }
 
-impl<'a> Parse<'a> for ExtensionDecl<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for ExtensionDecl {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
 		let keyword = input.consume(keyword![enable])?;
 		let name = input.consume_as(TokenKind::Ident, Token::Module)?;
 		input.consume(punct![;])?;
@@ -518,24 +529,24 @@ impl<'a> Parse<'a> for ExtensionDecl<'a> {
 	}
 }
 
-impl<'a> Spanned for ExtensionDecl<'a> {
+impl Spanned for ExtensionDecl {
 	fn span(&self) -> Span {
 		self.keyword.span().through(self.name.span())
 	}
 }
 
-impl<'a> ModuleDecl<'a> {
-	pub fn path(&'a self) -> &'a str {
+impl ModuleDecl {
+	pub fn path(&self) -> Substr {
 		let path = self.path.lexeme();
 
-		&path[1..path.len() - 1]
+		path.substr(1..path.len() - 1)
 	}
 }
 
-impl<'a> Parse<'a> for ModuleDecl<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for ModuleDecl {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
 		let import_kw = input.consume(keyword![import])?;
 		let name = input.consume_as(TokenKind::Ident, Token::Module)?;
 		let from_kw = input.consume(keyword![from])?;
@@ -552,7 +563,7 @@ impl<'a> Parse<'a> for ModuleDecl<'a> {
 	}
 }
 
-impl<'a> Spanned for ModuleDecl<'a> {
+impl Spanned for ModuleDecl {
 	fn span(&self) -> Span {
 		self.import_kw.span().through(self.semicolon.span())
 	}

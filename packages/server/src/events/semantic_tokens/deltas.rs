@@ -11,7 +11,7 @@ pub trait Delta {
 	fn delta(&self, prev: &Self) -> TokenDelta;
 }
 
-impl<'a> Delta for Token<'a> {
+impl Delta for Token {
 	fn delta(&self, prev: &Self) -> TokenDelta {
 		let cur_span = self.span();
 		let prev_span = prev.span();

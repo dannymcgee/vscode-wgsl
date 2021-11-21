@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use gramatika::{Spanned, Token as _};
+use gramatika::{Spanned, Substr, Token as _};
 use parser_v2::{
 	decl::{Decl, FieldDecl, StructDecl, VarDecl},
 	expr::{Expr, IdentExpr, PrimaryExpr},
@@ -12,25 +12,21 @@ use parser_v2::{
 
 use super::Document;
 
-pub struct FindDeclResult<'a> {
-	pub source_module: Option<Arc<Decl<'a>>>,
-	pub decl: Arc<Decl<'a>>,
-	pub parent: Option<Arc<Decl<'a>>>,
+pub struct FindDeclResult {
+	pub source_module: Option<Arc<Decl>>,
+	pub decl: Arc<Decl>,
+	pub parent: Option<Arc<Decl>>,
 }
 
-pub(super) struct DeclFinder<'a> {
-	scope: Arc<Scope<'a>>,
-	deps: HashMap<&'a str, &'a Document<'a>>,
-	needle: Token<'a>,
-	result: Option<FindDeclResult<'a>>,
+pub(super) struct DeclFinder {
+	scope: Arc<Scope>,
+	deps: HashMap<Substr, Document>,
+	needle: Token,
+	result: Option<FindDeclResult>,
 }
 
-impl<'a> DeclFinder<'a> {
-	pub fn new(
-		scope: Arc<Scope<'a>>,
-		deps: HashMap<&'a str, &'a Document<'a>>,
-		needle: Token<'a>,
-	) -> Self {
+impl DeclFinder {
+	pub fn new(scope: Arc<Scope>, deps: HashMap<Substr, Document>, needle: Token) -> Self {
 		Self {
 			scope,
 			deps,
@@ -39,16 +35,16 @@ impl<'a> DeclFinder<'a> {
 		}
 	}
 
-	pub fn result(&mut self) -> Option<FindDeclResult<'a>> {
+	pub fn result(&mut self) -> Option<FindDeclResult> {
 		self.result.take()
 	}
 }
 
-impl<'a> Visitor<'a> for DeclFinder<'a> {
-	fn visit_decl(&mut self, decl: &'a Decl<'a>) -> FlowControl {
+impl Visitor for DeclFinder {
+	fn visit_decl(&mut self, decl: &Decl) -> FlowControl {
 		if decl.name().span() == self.needle.span() {
 			// The needle is the declaration itself
-			if let Some(decl) = self.scope.find_decl(self.needle) {
+			if let Some(decl) = self.scope.find_decl(&self.needle) {
 				self.result = Some(FindDeclResult {
 					source_module: None,
 					decl,
@@ -66,9 +62,9 @@ impl<'a> Visitor<'a> for DeclFinder<'a> {
 		}
 	}
 
-	fn visit_var_decl(&mut self, decl: &'a VarDecl<'a>) -> FlowControl {
+	fn visit_var_decl(&mut self, decl: &VarDecl) -> FlowControl {
 		if decl.name.span() == self.needle.span() {
-			if let Some(decl) = self.scope.find_decl(self.needle) {
+			if let Some(decl) = self.scope.find_decl(&self.needle) {
 				self.result = Some(FindDeclResult {
 					source_module: None,
 					decl,
@@ -84,13 +80,13 @@ impl<'a> Visitor<'a> for DeclFinder<'a> {
 		}
 	}
 
-	fn visit_struct_decl(&mut self, decl: &'a StructDecl<'a>) -> FlowControl {
+	fn visit_struct_decl(&mut self, decl: &StructDecl) -> FlowControl {
 		for field in decl.body.fields.iter() {
 			if field.name().span() == self.needle.span() {
-				let parent = self.scope.find_decl(decl.name);
+				let parent = self.scope.find_decl(&decl.name);
 				self.result = self
 					.scope
-					.find_field_decl(self.needle, decl.name)
+					.find_field_decl(&self.needle, &decl.name)
 					.map(|decl| FindDeclResult {
 						source_module: None,
 						decl,
@@ -106,7 +102,7 @@ impl<'a> Visitor<'a> for DeclFinder<'a> {
 		FlowControl::Break
 	}
 
-	fn visit_field_decl(&mut self, decl: &'a FieldDecl<'a>) -> FlowControl {
+	fn visit_field_decl(&mut self, decl: &FieldDecl) -> FlowControl {
 		if decl.name.span() == self.needle.span() {
 			self.result = Some(FindDeclResult {
 				source_module: None,
@@ -122,7 +118,7 @@ impl<'a> Visitor<'a> for DeclFinder<'a> {
 		}
 	}
 
-	fn visit_stmt(&mut self, stmt: &'a Stmt<'a>) -> FlowControl {
+	fn visit_stmt(&mut self, stmt: &Stmt) -> FlowControl {
 		if stmt.span().contains(self.needle.span()) {
 			FlowControl::Continue
 		} else {
@@ -130,7 +126,7 @@ impl<'a> Visitor<'a> for DeclFinder<'a> {
 		}
 	}
 
-	fn visit_expr(&mut self, expr: &'a Expr<'a>) -> FlowControl {
+	fn visit_expr(&mut self, expr: &Expr) -> FlowControl {
 		if expr.span().contains(self.needle.span()) {
 			FlowControl::Continue
 		} else {
@@ -139,14 +135,14 @@ impl<'a> Visitor<'a> for DeclFinder<'a> {
 	}
 
 	// Special handling for dot-accessed fields of a struct instance
-	fn visit_primary_expr(&mut self, expr: &'a PrimaryExpr<'a>) -> FlowControl {
+	fn visit_primary_expr(&mut self, expr: &PrimaryExpr) -> FlowControl {
 		// If this isn't an ident expression, or if it's a namespaced ident, return early
 		// for processing by other `visit` methods. Otherwise, capture the ident name.
 		let var_name = if let Expr::Ident(ref inner) = expr.expr.as_ref() {
 			if inner.namespace.is_some() {
 				return FlowControl::Continue;
 			}
-			inner.name
+			inner.name.clone()
 		} else {
 			return FlowControl::Continue;
 		};
@@ -160,7 +156,7 @@ impl<'a> Visitor<'a> for DeclFinder<'a> {
 				if postfix.span().contains(self.needle.span())
 					&& postfix.expr.span().start == self.needle.span().start
 				{
-					Some(self.needle)
+					Some(self.needle.clone())
 				} else {
 					None
 				}
@@ -170,7 +166,7 @@ impl<'a> Visitor<'a> for DeclFinder<'a> {
 			.and_then(|field_name| {
 				let struct_name =
 					self.scope
-						.find_decl(var_name)
+						.find_decl(&var_name)
 						.and_then(|decl| match decl.as_ref() {
 							Decl::Var(inner) | Decl::Const(inner) => {
 								inner.ty.as_ref().map(|ty| ty.name.clone())
@@ -191,7 +187,7 @@ impl<'a> Visitor<'a> for DeclFinder<'a> {
 			// Look up the module declaration for inclusion in the result
 			let module = self
 				.scope
-				.find_decl(namespace)
+				.find_decl(&namespace)
 				.and_then(|decl| match decl.as_ref() {
 					Decl::Module(_) => Some(decl),
 					_ => None,
@@ -199,7 +195,7 @@ impl<'a> Visitor<'a> for DeclFinder<'a> {
 
 			// Look up the struct declaration
 			let name = struct_name.name;
-			if let Some(document) = self.deps.get(namespace.lexeme()) {
+			if let Some(document) = self.deps.get(&namespace.lexeme()) {
 				if let Some(struct_decl) = document
 					.ast
 					.inner
@@ -225,11 +221,11 @@ impl<'a> Visitor<'a> for DeclFinder<'a> {
 			}
 		} else {
 			// The struct is local to this module, so we can look it up directly
-			let parent = self.scope.find_decl(struct_name.name);
+			let parent = self.scope.find_decl(&struct_name.name);
 
 			self.result = self
 				.scope
-				.find_field_decl(field_name, struct_name.name)
+				.find_field_decl(&field_name, &struct_name.name)
 				.map(|decl| FindDeclResult {
 					source_module: None,
 					decl,
@@ -240,14 +236,14 @@ impl<'a> Visitor<'a> for DeclFinder<'a> {
 		FlowControl::Break
 	}
 
-	fn visit_ident_expr(&mut self, expr: &'a IdentExpr<'a>) {
+	fn visit_ident_expr(&mut self, expr: &IdentExpr) {
 		// Early return if we've already found the needle or if the needle isn't in this node
 		if self.result.is_some() || !expr.span().contains(self.needle.span()) {
 			return;
 		}
 
 		// Handle namespaced idents
-		if let Some(namespace) = expr.namespace {
+		if let Some(ref namespace) = expr.namespace {
 			// The namespace is the needle
 			if namespace.span() == self.needle.span() {
 				self.result = self.scope.find_decl(namespace).map(|decl| FindDeclResult {
@@ -258,7 +254,7 @@ impl<'a> Visitor<'a> for DeclFinder<'a> {
 			}
 			// The name is the needle, so we need to look up the source module
 			else if expr.name.span() == self.needle.span() {
-				self.result = self.deps.get(namespace.lexeme()).and_then(|document| {
+				self.result = self.deps.get(&namespace.lexeme()).and_then(|document| {
 					// Look up the matching declaration in the source module's AST
 
 					// NOTE: This will find the matching declaration even if it isn't `export`
@@ -288,7 +284,7 @@ impl<'a> Visitor<'a> for DeclFinder<'a> {
 		}
 		// Happy path -- Look up the declaration and return it
 		else if expr.name.span() == self.needle.span() {
-			self.result = self.scope.find_decl(expr.name).map(|decl| FindDeclResult {
+			self.result = self.scope.find_decl(&expr.name).map(|decl| FindDeclResult {
 				source_module: None,
 				decl,
 				parent: None,

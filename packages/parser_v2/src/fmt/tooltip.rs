@@ -11,7 +11,7 @@ pub trait Tooltip {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result;
 }
 
-impl<'a> Tooltip for Decl<'a> {
+impl Tooltip for Decl {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		use Decl::*;
 
@@ -28,7 +28,7 @@ impl<'a> Tooltip for Decl<'a> {
 	}
 }
 
-impl<'a> Tooltip for VarDecl<'a> {
+impl Tooltip for VarDecl {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		if let Some(ref attributes) = self.attributes {
 			writeln!(f, "{}", attributes)?;
@@ -48,13 +48,13 @@ impl<'a> Tooltip for VarDecl<'a> {
 	}
 }
 
-impl<'a> Tooltip for TypeAliasDecl<'a> {
+impl Tooltip for TypeAliasDecl {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "TODO")
 	}
 }
 
-impl<'a> Tooltip for StructDecl<'a> {
+impl Tooltip for StructDecl {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		if let Some(ref attributes) = self.attributes {
 			writeln!(f, "{}", attributes)?;
@@ -71,7 +71,7 @@ impl<'a> Tooltip for StructDecl<'a> {
 	}
 }
 
-impl<'a> Tooltip for StructBody<'a> {
+impl Tooltip for StructBody {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		writeln!(f, "{{")?;
 
@@ -85,13 +85,13 @@ impl<'a> Tooltip for StructBody<'a> {
 	}
 }
 
-impl<'a> Tooltip for FieldDecl<'a> {
+impl Tooltip for FieldDecl {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "{}", self)
 	}
 }
 
-impl<'a> Tooltip for FunctionDecl<'a> {
+impl Tooltip for FunctionDecl {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		if let Some(ref attributes) = self.attributes {
 			writeln!(f, "{} ", attributes)?;
@@ -119,7 +119,7 @@ impl<'a> Tooltip for FunctionDecl<'a> {
 	}
 }
 
-impl<'a> Tooltip for ParamDecl<'a> {
+impl Tooltip for ParamDecl {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		if let Some(ref attributes) = self.attributes {
 			writeln!(f, "{} ", attributes)?;
@@ -129,13 +129,13 @@ impl<'a> Tooltip for ParamDecl<'a> {
 	}
 }
 
-impl<'a> Tooltip for ExtensionDecl<'a> {
+impl Tooltip for ExtensionDecl {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "TODO")
 	}
 }
 
-impl<'a> Tooltip for ModuleDecl<'a> {
+impl Tooltip for ModuleDecl {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "import {} from {};", self.name, self.path)
 	}

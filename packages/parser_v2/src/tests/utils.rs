@@ -100,7 +100,7 @@ fn binary_expr() {
 	}
 }
 
-fn parse<'a>() -> SyntaxTree<'a> {
+fn parse() -> SyntaxTree {
 	match ParseStream::from(PROGRAM).parse::<SyntaxTree>() {
 		Ok(tree) => tree,
 		Err(err) => {

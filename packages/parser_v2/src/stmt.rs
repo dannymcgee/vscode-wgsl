@@ -1,143 +1,148 @@
 #![allow(unused_variables)]
 
-use gramatika::{Parse, ParseStreamer, Spanned, SpannedError};
+use std::sync::Arc;
+
+use gramatika::{Parse, ParseStreamer, Spanned, SpannedError, Token as _};
 
 use crate::{decl::VarDecl, expr::Expr, ParseStream, Token, *};
 
 #[allow(clippy::large_enum_variant)] // TODO
 #[derive(Clone, DebugLisp)]
-pub enum Stmt<'a> {
-	Block(BlockStmt<'a>),
-	Return(ReturnStmt<'a>),
-	If(IfStmt<'a>),
-	Switch(SwitchStmt<'a>),
-	Loop(LoopStmt<'a>),
-	Continuing(ContinuingStmt<'a>),
-	For(ForStmt<'a>),
-	Var(VarDecl<'a>),
-	Break(KeywordStmt<'a>),
-	Continue(KeywordStmt<'a>),
-	Discard(KeywordStmt<'a>),
-	Fallthrough(KeywordStmt<'a>),
-	Expr(ExprStmt<'a>),
-	Empty(Token<'a>),
+pub enum Stmt {
+	Block(BlockStmt),
+	Return(ReturnStmt),
+	If(IfStmt),
+	Switch(SwitchStmt),
+	Loop(LoopStmt),
+	Continuing(ContinuingStmt),
+	For(ForStmt),
+	Var(VarDecl),
+	Break(KeywordStmt),
+	Continue(KeywordStmt),
+	Discard(KeywordStmt),
+	Fallthrough(KeywordStmt),
+	Expr(ExprStmt),
+	Empty(Token),
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct BlockStmt<'a> {
-	pub brace_open: Token<'a>,
-	pub stmts: Vec<Stmt<'a>>,
-	pub brace_close: Token<'a>,
+pub struct BlockStmt {
+	pub brace_open: Token,
+	pub stmts: Arc<[Stmt]>,
+	pub brace_close: Token,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct ReturnStmt<'a> {
-	pub keyword: Token<'a>,
-	pub value: Option<Expr<'a>>,
-	pub semicolon: Token<'a>,
+pub struct ReturnStmt {
+	pub keyword: Token,
+	pub value: Option<Expr>,
+	pub semicolon: Token,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct IfStmt<'a> {
-	pub keyword: Token<'a>,
-	pub condition: Expr<'a>,
-	pub then_branch: BlockStmt<'a>,
-	pub elseif_branch: Option<Box<IfStmt<'a>>>,
-	pub else_branch: Option<ElseStmt<'a>>,
+pub struct IfStmt {
+	pub keyword: Token,
+	pub condition: Expr,
+	pub then_branch: BlockStmt,
+	pub elseif_branch: Option<Arc<IfStmt>>,
+	pub else_branch: Option<ElseStmt>,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct ElseStmt<'a> {
-	pub keyword: Token<'a>,
-	pub body: BlockStmt<'a>,
+pub struct ElseStmt {
+	pub keyword: Token,
+	pub body: BlockStmt,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct SwitchStmt<'a> {
-	pub keyword: Token<'a>,
-	pub subject: Expr<'a>,
-	pub body: SwitchBody<'a>,
+pub struct SwitchStmt {
+	pub keyword: Token,
+	pub subject: Expr,
+	pub body: SwitchBody,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct SwitchBody<'a> {
-	pub brace_open: Token<'a>,
-	pub cases: Vec<CaseStmt<'a>>,
-	pub default: Option<DefaultStmt<'a>>,
-	pub brace_close: Token<'a>,
+pub struct SwitchBody {
+	pub brace_open: Token,
+	pub cases: Arc<[CaseStmt]>,
+	pub default: Option<DefaultStmt>,
+	pub brace_close: Token,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct CaseStmt<'a> {
-	pub keyword: Token<'a>,
-	pub selectors: Vec<Token<'a>>,
-	pub colon: Token<'a>,
-	pub body: BlockStmt<'a>,
+pub struct CaseStmt {
+	pub keyword: Token,
+	pub selectors: Arc<[Token]>,
+	pub colon: Token,
+	pub body: BlockStmt,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct DefaultStmt<'a> {
-	pub keyword: Token<'a>,
-	pub colon: Token<'a>,
-	pub body: BlockStmt<'a>,
+pub struct DefaultStmt {
+	pub keyword: Token,
+	pub colon: Token,
+	pub body: BlockStmt,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct LoopStmt<'a> {
-	pub keyword: Token<'a>,
-	pub body: BlockStmt<'a>,
+pub struct LoopStmt {
+	pub keyword: Token,
+	pub body: BlockStmt,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct ContinuingStmt<'a> {
-	pub keyword: Token<'a>,
-	pub body: BlockStmt<'a>,
+pub struct ContinuingStmt {
+	pub keyword: Token,
+	pub body: BlockStmt,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct ForStmt<'a> {
-	pub keyword: Token<'a>,
-	pub initializer: Option<Box<Stmt<'a>>>,
-	pub condition: Option<Box<Stmt<'a>>>,
-	pub increment: Option<Expr<'a>>,
-	pub body: BlockStmt<'a>,
+pub struct ForStmt {
+	pub keyword: Token,
+	pub initializer: Option<Arc<Stmt>>,
+	pub condition: Option<Arc<Stmt>>,
+	pub increment: Option<Expr>,
+	pub body: BlockStmt,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct KeywordStmt<'a> {
-	pub keyword: Token<'a>,
-	pub semicolon: Token<'a>,
+pub struct KeywordStmt {
+	pub keyword: Token,
+	pub semicolon: Token,
 }
 
 #[derive(Clone, DebugLisp)]
-pub struct ExprStmt<'a> {
-	pub expr: Expr<'a>,
-	pub semicolon: Token<'a>,
+pub struct ExprStmt {
+	pub expr: Expr,
+	pub semicolon: Token,
 }
 
 // -- Parse impl -------------------------------------------------------------------------
 
-impl<'a> Parse<'a> for Stmt<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for Stmt {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
-		use Token::*;
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
+		use TokenKind::*;
 
 		match input.peek() {
-			Some(Keyword("return", _)) => Ok(Stmt::Return(input.parse()?)),
-			Some(Keyword("if", _)) => Ok(Stmt::If(input.parse()?)),
-			Some(Keyword("switch", _)) => Ok(Stmt::Switch(input.parse()?)),
-			Some(Keyword("loop", _)) => Ok(Stmt::Loop(input.parse()?)),
-			Some(Keyword("continuing", _)) => Ok(Stmt::Continuing(input.parse()?)),
-			Some(Keyword("for", _)) => Ok(Stmt::For(input.parse()?)),
-			Some(Keyword("var" | "let", _)) => Ok(Stmt::Var(input.parse()?)),
-			Some(Keyword("break", _)) => Ok(Stmt::Break(input.parse()?)),
-			Some(Keyword("continue", _)) => Ok(Stmt::Continue(input.parse()?)),
-			Some(Keyword("discard", _)) => Ok(Stmt::Discard(input.parse()?)),
-			Some(Keyword("fallthrough", _)) => Ok(Stmt::Fallthrough(input.parse()?)),
-			Some(Brace("{", _)) => Ok(Stmt::Block(input.parse()?)),
-			Some(Punct(";", _)) => Ok(Stmt::Empty(input.next().unwrap())),
-			Some(other) => Ok(Stmt::Expr(input.parse()?)),
+			#[rustfmt::skip]
+			Some(token) => match token.as_matchable() {
+				(Keyword, "return", _)      => Ok(Stmt::Return(input.parse()?)),
+				(Keyword, "if", _)          => Ok(Stmt::If(input.parse()?)),
+				(Keyword, "switch", _)      => Ok(Stmt::Switch(input.parse()?)),
+				(Keyword, "loop", _)        => Ok(Stmt::Loop(input.parse()?)),
+				(Keyword, "continuing", _)  => Ok(Stmt::Continuing(input.parse()?)),
+				(Keyword, "for", _)         => Ok(Stmt::For(input.parse()?)),
+				(Keyword, "var" | "let", _) => Ok(Stmt::Var(input.parse()?)),
+				(Keyword, "break", _)       => Ok(Stmt::Break(input.parse()?)),
+				(Keyword, "continue", _)    => Ok(Stmt::Continue(input.parse()?)),
+				(Keyword, "discard", _)     => Ok(Stmt::Discard(input.parse()?)),
+				(Keyword, "fallthrough", _) => Ok(Stmt::Fallthrough(input.parse()?)),
+				(Brace, "{", _)             => Ok(Stmt::Block(input.parse()?)),
+				(Punct, ";", _)             => Ok(Stmt::Empty(input.next().unwrap())),
+				_ => Ok(Stmt::Expr(input.parse()?)),
+			},
 			None => Err(SpannedError {
 				message: "Unexpected end of input".into(),
 				source: input.source(),
@@ -147,7 +152,7 @@ impl<'a> Parse<'a> for Stmt<'a> {
 	}
 }
 
-impl<'a> Spanned for Stmt<'a> {
+impl Spanned for Stmt {
 	fn span(&self) -> Span {
 		use Stmt::*;
 
@@ -170,10 +175,10 @@ impl<'a> Spanned for Stmt<'a> {
 	}
 }
 
-impl<'a> Parse<'a> for BlockStmt<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for BlockStmt {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
 		let brace_open = input.consume(brace!["{"])?;
 
 		let mut stmts = vec![];
@@ -188,22 +193,22 @@ impl<'a> Parse<'a> for BlockStmt<'a> {
 
 		Ok(Self {
 			brace_open,
-			stmts,
+			stmts: stmts.into(),
 			brace_close,
 		})
 	}
 }
 
-impl<'a> Spanned for BlockStmt<'a> {
+impl Spanned for BlockStmt {
 	fn span(&self) -> Span {
 		self.brace_open.span().through(self.brace_close.span())
 	}
 }
 
-impl<'a> Parse<'a> for ReturnStmt<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for ReturnStmt {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
 		let keyword = input.consume(keyword![return])?;
 
 		if input.check(punct![;]) {
@@ -227,22 +232,22 @@ impl<'a> Parse<'a> for ReturnStmt<'a> {
 	}
 }
 
-impl<'a> Spanned for ReturnStmt<'a> {
+impl Spanned for ReturnStmt {
 	fn span(&self) -> Span {
 		self.keyword.span().through(self.semicolon.span())
 	}
 }
 
-impl<'a> Parse<'a> for IfStmt<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for IfStmt {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
 		let keyword = input.consume_kind(TokenKind::Keyword)?;
 		let condition = input.parse::<Expr>()?;
 		let then_branch = input.parse::<BlockStmt>()?;
 
 		let elseif_branch = if input.check(keyword![elseif]) {
-			Some(Box::new(input.parse::<IfStmt>()?))
+			Some(Arc::new(input.parse::<IfStmt>()?))
 		} else {
 			None
 		};
@@ -263,7 +268,7 @@ impl<'a> Parse<'a> for IfStmt<'a> {
 	}
 }
 
-impl<'a> Spanned for IfStmt<'a> {
+impl Spanned for IfStmt {
 	fn span(&self) -> Span {
 		let end_span = self
 			.else_branch
@@ -276,10 +281,10 @@ impl<'a> Spanned for IfStmt<'a> {
 	}
 }
 
-impl<'a> Parse<'a> for ElseStmt<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for ElseStmt {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
 		let keyword = input.consume(keyword![else])?;
 		let body = input.parse::<BlockStmt>()?;
 
@@ -287,16 +292,16 @@ impl<'a> Parse<'a> for ElseStmt<'a> {
 	}
 }
 
-impl<'a> Spanned for ElseStmt<'a> {
+impl Spanned for ElseStmt {
 	fn span(&self) -> Span {
 		self.keyword.span().through(self.body.span())
 	}
 }
 
-impl<'a> Parse<'a> for SwitchStmt<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for SwitchStmt {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
 		let keyword = input.consume(keyword![switch])?;
 		let subject = input.parse::<Expr>()?;
 		let body = input.parse::<SwitchBody>()?;
@@ -309,17 +314,17 @@ impl<'a> Parse<'a> for SwitchStmt<'a> {
 	}
 }
 
-impl<'a> Spanned for SwitchStmt<'a> {
+impl Spanned for SwitchStmt {
 	fn span(&self) -> Span {
 		self.keyword.span().through(self.body.span())
 	}
 }
 
-impl<'a> Parse<'a> for SwitchBody<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for SwitchBody {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
-		use Token::*;
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
+		use TokenKind::*;
 
 		let brace_open = input.consume(brace!["{"])?;
 
@@ -328,15 +333,17 @@ impl<'a> Parse<'a> for SwitchBody<'a> {
 
 		while !input.check(brace!["}"]) {
 			match input.peek() {
-				Some(Keyword("case", _)) => cases.push(input.parse::<CaseStmt>()?),
-				Some(Keyword("default", _)) => default = Some(input.parse::<DefaultStmt>()?),
-				Some(other) => {
-					return Err(SpannedError {
-						message: "Expected `case` or `default`".into(),
-						span: Some(other.span()),
-						source: input.source(),
-					})
-				}
+				Some(token) => match token.as_matchable() {
+					(Keyword, "case", _) => cases.push(input.parse::<CaseStmt>()?),
+					(Keyword, "default", _) => default = Some(input.parse::<DefaultStmt>()?),
+					(_, _, span) => {
+						return Err(SpannedError {
+							message: "Expected `case` or `default`".into(),
+							span: Some(span),
+							source: input.source(),
+						})
+					}
+				},
 				None => {
 					return Err(SpannedError {
 						message: "Unexpected end of input".into(),
@@ -351,45 +358,43 @@ impl<'a> Parse<'a> for SwitchBody<'a> {
 
 		Ok(Self {
 			brace_open,
-			cases,
+			cases: cases.into(),
 			default,
 			brace_close,
 		})
 	}
 }
 
-impl<'a> Spanned for SwitchBody<'a> {
+impl Spanned for SwitchBody {
 	fn span(&self) -> Span {
 		self.brace_open.span().through(self.brace_close.span())
 	}
 }
 
-impl<'a> Parse<'a> for CaseStmt<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for CaseStmt {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
-		use Token::*;
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
+		use TokenKind::*;
 
 		let keyword = input.consume(keyword![case])?;
 
 		let mut selectors = vec![];
 		while !input.check(punct![:]) {
 			match input.next() {
-				Some(
-					token @ IntLiteral(_, _)
-					| token @ UintLiteral(_, _)
-					| token @ FloatLiteral(_, _),
-				) => {
-					selectors.push(token);
-				}
-				Some(Punct(",", _)) => {}
-				Some(other) => {
-					return Err(SpannedError {
-						message: "Expected case selector".into(),
-						source: input.source(),
-						span: Some(other.span()),
-					})
-				}
+				Some(token) => match token.as_matchable() {
+					(IntLiteral | UintLiteral | FloatLiteral, _, _) => {
+						selectors.push(token);
+					}
+					(Punct, ",", _) => {}
+					(_, _, span) => {
+						return Err(SpannedError {
+							message: "Expected case selector".into(),
+							source: input.source(),
+							span: Some(span),
+						})
+					}
+				},
 				None => {
 					return Err(SpannedError {
 						message: "Unexpected end of input".into(),
@@ -405,23 +410,23 @@ impl<'a> Parse<'a> for CaseStmt<'a> {
 
 		Ok(Self {
 			keyword,
-			selectors,
+			selectors: selectors.into(),
 			colon,
 			body,
 		})
 	}
 }
 
-impl<'a> Spanned for CaseStmt<'a> {
+impl Spanned for CaseStmt {
 	fn span(&self) -> Span {
 		self.keyword.span().through(self.body.span())
 	}
 }
 
-impl<'a> Parse<'a> for DefaultStmt<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for DefaultStmt {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
 		let keyword = input.consume(keyword![default])?;
 		let colon = input.consume(punct![:])?;
 		let body = input.parse::<BlockStmt>()?;
@@ -434,16 +439,16 @@ impl<'a> Parse<'a> for DefaultStmt<'a> {
 	}
 }
 
-impl<'a> Spanned for DefaultStmt<'a> {
+impl Spanned for DefaultStmt {
 	fn span(&self) -> Span {
 		self.keyword.span().through(self.body.span())
 	}
 }
 
-impl<'a> Parse<'a> for LoopStmt<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for LoopStmt {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
 		let keyword = input.consume(keyword![loop])?;
 		let body = input.parse::<BlockStmt>()?;
 
@@ -451,16 +456,16 @@ impl<'a> Parse<'a> for LoopStmt<'a> {
 	}
 }
 
-impl<'a> Spanned for LoopStmt<'a> {
+impl Spanned for LoopStmt {
 	fn span(&self) -> Span {
 		self.keyword.span().through(self.body.span())
 	}
 }
 
-impl<'a> Parse<'a> for ContinuingStmt<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for ContinuingStmt {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
 		let keyword = input.consume(keyword![continuing])?;
 		let body = input.parse::<BlockStmt>()?;
 
@@ -468,16 +473,16 @@ impl<'a> Parse<'a> for ContinuingStmt<'a> {
 	}
 }
 
-impl<'a> Spanned for ContinuingStmt<'a> {
+impl Spanned for ContinuingStmt {
 	fn span(&self) -> Span {
 		self.keyword.span().through(self.body.span())
 	}
 }
 
-impl<'a> Parse<'a> for ForStmt<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for ForStmt {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
 		let keyword = input.consume(keyword![for])?;
 		input.consume(brace!["("])?;
 
@@ -491,11 +496,11 @@ impl<'a> Parse<'a> for ForStmt<'a> {
 			match input.peek() {
 				Some(token) => match semis {
 					0 => {
-						initializer = Some(Box::new(input.parse::<Stmt>()?));
+						initializer = Some(Arc::new(input.parse::<Stmt>()?));
 						semis += 1;
 					}
 					1 => {
-						condition = Some(Box::new(input.parse::<Stmt>()?));
+						condition = Some(Arc::new(input.parse::<Stmt>()?));
 						semis += 1;
 					}
 					2 => increment = Some(input.parse::<Expr>()?),
@@ -530,16 +535,16 @@ impl<'a> Parse<'a> for ForStmt<'a> {
 	}
 }
 
-impl<'a> Spanned for ForStmt<'a> {
+impl Spanned for ForStmt {
 	fn span(&self) -> Span {
 		self.keyword.span().through(self.body.span())
 	}
 }
 
-impl<'a> Parse<'a> for KeywordStmt<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for KeywordStmt {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
 		let keyword = input.consume_kind(TokenKind::Keyword)?;
 		let semicolon = input.consume(punct![;])?;
 
@@ -547,16 +552,16 @@ impl<'a> Parse<'a> for KeywordStmt<'a> {
 	}
 }
 
-impl<'a> Spanned for KeywordStmt<'a> {
+impl Spanned for KeywordStmt {
 	fn span(&self) -> Span {
 		self.keyword.span().through(self.semicolon.span())
 	}
 }
 
-impl<'a> Parse<'a> for ExprStmt<'a> {
-	type Stream = ParseStream<'a>;
+impl Parse for ExprStmt {
+	type Stream = ParseStream;
 
-	fn parse(input: &mut Self::Stream) -> gramatika::Result<'a, Self> {
+	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
 		let expr = input.parse::<Expr>()?;
 		let semicolon = input.consume(punct![;])?;
 
@@ -564,7 +569,7 @@ impl<'a> Parse<'a> for ExprStmt<'a> {
 	}
 }
 
-impl<'a> Spanned for ExprStmt<'a> {
+impl Spanned for ExprStmt {
 	fn span(&self) -> Span {
 		self.expr.span().through(self.semicolon.span())
 	}

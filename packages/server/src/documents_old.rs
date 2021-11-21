@@ -18,7 +18,7 @@ use serde_json as json;
 use wgsl_plus::{GetExports, ResolveDeps, ResolveImportPath};
 
 use crate::{
-	diagnostics::{self, ErrorKind},
+	diagnostics_old::{self, ErrorKind},
 	lsp_extensions::{UnreadDependency, UnreadDependencyParams},
 };
 
@@ -172,7 +172,7 @@ impl Document {
 		let ast = match parser::parse_ast(input) {
 			Ok(ast) => Some(Arc::new(ast)),
 			Err(err) => {
-				diagnostics::report_error(uri, err, ErrorKind::ParseError);
+				diagnostics_old::report_error(uri, err, ErrorKind::ParseError);
 				None
 			}
 		};
@@ -248,7 +248,7 @@ impl Document {
 	}
 
 	fn update(&mut self, params: &DidChangeTextDocumentParams) -> Result<()> {
-		diagnostics::clear_errors(&self.uri);
+		diagnostics_old::clear_errors(&self.uri);
 
 		for update in &params.content_changes {
 			let range = update.range.unwrap();
@@ -268,7 +268,7 @@ impl Document {
 		self.ast = match parser::parse_ast(&self.text.to_string()) {
 			Ok(ast) => Some(Arc::new(ast)),
 			Err(err) => {
-				diagnostics::report_error(&self.uri, err, ErrorKind::ParseError);
+				diagnostics_old::report_error(&self.uri, err, ErrorKind::ParseError);
 				None
 			}
 		};
@@ -331,20 +331,24 @@ impl Document {
 
 				match self.transpile() {
 					Ok(text) if self.is_compilable() => {
-						diagnostics::validate(self.uri.clone(), text)
+						diagnostics_old::validate(self.uri.clone(), text)
 					}
 					Err(Multiple(errs)) => {
 						for err in errs {
-							diagnostics::report_error(&self.uri, err, ErrorKind::TranspileError);
+							diagnostics_old::report_error(
+								&self.uri,
+								err,
+								ErrorKind::TranspileError,
+							);
 						}
 					}
 					Err(single) => {
-						diagnostics::report_error(&self.uri, single, ErrorKind::TranspileError)
+						diagnostics_old::report_error(&self.uri, single, ErrorKind::TranspileError)
 					}
 					_ => {}
 				}
 			} else {
-				diagnostics::validate(self.uri.clone(), self.text.to_string());
+				diagnostics_old::validate(self.uri.clone(), self.text.to_string());
 			}
 		}
 	}

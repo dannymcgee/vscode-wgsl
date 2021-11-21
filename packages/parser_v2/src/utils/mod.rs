@@ -7,13 +7,13 @@ use lsp_types::{Position, Range};
 pub use parents::{find_parent, find_parents};
 
 #[derive(DebugLisp)]
-pub enum SyntaxNode<'a> {
-	Decl(Decl<'a>),
-	Stmt(Stmt<'a>),
-	Expr(Expr<'a>),
+pub enum SyntaxNode {
+	Decl(Decl),
+	Stmt(Stmt),
+	Expr(Expr),
 }
 
-impl<'a> Spanned for SyntaxNode<'a> {
+impl Spanned for SyntaxNode {
 	fn span(&self) -> gramatika::Span {
 		match self {
 			SyntaxNode::Decl(decl) => decl.span(),

@@ -23,7 +23,7 @@ use lsp_types::{
 use parking_lot::Mutex;
 
 use crate::{
-	documents_v2::{Documents, Status},
+	documents::{Documents, Status},
 	lsp_extensions::{DebugAst, DebugDocumentParams, DebugTokens},
 };
 
@@ -53,15 +53,13 @@ enum DocEvent {
 	Close(DidCloseTextDocumentParams),
 }
 
-pub struct Dispatcher<'a>
-where 'a: 'static
-{
+pub struct Dispatcher {
 	queue: Arc<Mutex<VecDeque<Request>>>,
-	documents: Arc<Documents<'a>>,
+	documents: Arc<Documents>,
 	ipc: Sender<Message>,
 }
 
-impl<'a> Clone for Dispatcher<'a> {
+impl Clone for Dispatcher {
 	fn clone(&self) -> Self {
 		Self {
 			queue: Arc::clone(&self.queue),
@@ -82,7 +80,7 @@ macro_rules! next {
 	}
 }
 
-impl<'a> Dispatcher<'a> {
+impl Dispatcher {
 	pub fn new(tx: Sender<Message>) -> Self {
 		let (documents, docs_status) = Documents::new(tx.clone());
 		let this = Self {
@@ -217,7 +215,7 @@ pub struct DispatchError {
 impl From<LSPRequest> for DispatchError {
 	fn from(req: LSPRequest) -> Self {
 		Self {
-			message: format!("No event handler for request:\n{:?}", req),
+			message: std::format!("No event handler for request:\n{:?}", req),
 		}
 	}
 }
@@ -225,7 +223,7 @@ impl From<LSPRequest> for DispatchError {
 impl From<Notification> for DispatchError {
 	fn from(notif: Notification) -> Self {
 		Self {
-			message: format!("No event handler for notification:\n{:?}", notif),
+			message: std::format!("No event handler for notification:\n{:?}", notif),
 		}
 	}
 }
@@ -233,7 +231,7 @@ impl From<Notification> for DispatchError {
 impl From<Message> for DispatchError {
 	fn from(msg: Message) -> Self {
 		Self {
-			message: format!("No event handler for message:\n{:?}", msg),
+			message: std::format!("No event handler for message:\n{:?}", msg),
 		}
 	}
 }

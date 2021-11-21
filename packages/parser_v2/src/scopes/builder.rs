@@ -9,19 +9,19 @@ use crate::{
 	},
 	stmt::{BlockStmt, CaseStmt, ContinuingStmt, ElseStmt, ForStmt, IfStmt, LoopStmt, Stmt},
 	traversal::{FlowControl, Visitor, Walk},
-	Token,
+	TokenKind,
 };
 
-pub(super) struct ScopeBuilder<'a> {
+pub(super) struct ScopeBuilder {
 	// We need to hold a persistent reference to the root, because each node holds only a
 	// weak reference to its parent, but a strong reference to each of its children. If we
 	// didn't keep a separate reference to the root, each parent would be dropped and de-
 	// allocated as soon as we spawned and stepped into a new child.
-	root: Arc<Scope<'a>>,
-	current: Arc<Scope<'a>>,
+	root: Arc<Scope>,
+	current: Arc<Scope>,
 }
 
-impl<'a> ScopeBuilder<'a> {
+impl ScopeBuilder {
 	pub(super) fn new(span: Span) -> Self {
 		let root = Arc::new(Scope::new(span));
 
@@ -31,18 +31,18 @@ impl<'a> ScopeBuilder<'a> {
 		}
 	}
 
-	pub(super) fn build(self) -> Arc<Scope<'a>> {
+	pub(super) fn build(self) -> Arc<Scope> {
 		self.root
 	}
 
-	fn spawn_for_decl(&self, start: Position) -> Arc<Scope<'a>> {
+	fn spawn_for_decl(&self, start: Position) -> Arc<Scope> {
 		let end = self.current.span.end;
 		let span = Span { start, end };
 
 		Scope::with_parent(span, Arc::clone(&self.current))
 	}
 
-	fn spawn_for_block(&self, block: &BlockStmt<'a>) -> Arc<Scope<'a>> {
+	fn spawn_for_block(&self, block: &BlockStmt) -> Arc<Scope> {
 		let start = block.brace_open.span().end;
 		let end = block.brace_close.span().start;
 		let span = Span { start, end };
@@ -72,21 +72,21 @@ macro_rules! simple_decl {
 	}};
 }
 
-impl<'a> Visitor<'a> for ScopeBuilder<'a> {
+impl Visitor for ScopeBuilder {
 	// --- Simple declarations ------------------------------------------------------------
 
-	fn visit_module_decl(&mut self, decl: &'a ModuleDecl<'a>) {
+	fn visit_module_decl(&mut self, decl: &ModuleDecl) {
 		simple_decl!(self, Module(decl));
 	}
 
-	fn visit_type_alias_decl(&mut self, decl: &'a TypeAliasDecl<'a>) -> FlowControl {
+	fn visit_type_alias_decl(&mut self, decl: &TypeAliasDecl) -> FlowControl {
 		simple_decl!(self, TypeAlias(decl));
 
 		FlowControl::Break
 	}
 
-	fn visit_var_decl(&mut self, decl: &'a VarDecl<'a>) -> FlowControl {
-		match decl.storage.lexeme() {
+	fn visit_var_decl(&mut self, decl: &VarDecl) -> FlowControl {
+		match decl.storage.lexeme().as_str() {
 			"let" => simple_decl!(self, Const(decl)),
 			"var" => simple_decl!(self, Var(decl)),
 			_ => unreachable!(),
@@ -97,7 +97,7 @@ impl<'a> Visitor<'a> for ScopeBuilder<'a> {
 
 	// --- Struct declaration -------------------------------------------------------------
 
-	fn visit_struct_decl(&mut self, decl: &'a StructDecl<'a>) -> FlowControl {
+	fn visit_struct_decl(&mut self, decl: &StructDecl) -> FlowControl {
 		let ident = decl.name.lexeme();
 		let start = decl.name.span().start;
 		let kind = decl.name.kind();
@@ -118,7 +118,7 @@ impl<'a> Visitor<'a> for ScopeBuilder<'a> {
 		FlowControl::Break
 	}
 
-	fn visit_field_decl(&mut self, decl: &'a FieldDecl<'a>) -> FlowControl {
+	fn visit_field_decl(&mut self, decl: &FieldDecl) -> FlowControl {
 		let ident = decl.name.lexeme();
 		let kind = decl.name.kind();
 		self.current
@@ -129,7 +129,7 @@ impl<'a> Visitor<'a> for ScopeBuilder<'a> {
 
 	// --- Function declaration -----------------------------------------------------------
 
-	fn visit_func_decl(&mut self, decl: &'a FunctionDecl<'a>) -> FlowControl {
+	fn visit_func_decl(&mut self, decl: &FunctionDecl) -> FlowControl {
 		// Create an new scope from the opening brace through the end of the current scope,
 		// and add the function declaration to it
 		let ident = decl.name.lexeme();
@@ -162,7 +162,7 @@ impl<'a> Visitor<'a> for ScopeBuilder<'a> {
 		FlowControl::Break
 	}
 
-	fn visit_param_decl(&mut self, decl: &'a ParamDecl<'a>) -> FlowControl {
+	fn visit_param_decl(&mut self, decl: &ParamDecl) -> FlowControl {
 		let ident = decl.name.lexeme();
 		let kind = decl.name.kind();
 		self.current
@@ -173,7 +173,7 @@ impl<'a> Visitor<'a> for ScopeBuilder<'a> {
 
 	// --- If statement and friends -------------------------------------------------------
 
-	fn visit_if_stmt(&mut self, stmt: &'a IfStmt<'a>) -> FlowControl {
+	fn visit_if_stmt(&mut self, stmt: &IfStmt) -> FlowControl {
 		let starting_scope = self.spawn_for_block(&stmt.then_branch);
 		self.current = Arc::clone(&starting_scope);
 
@@ -187,7 +187,7 @@ impl<'a> Visitor<'a> for ScopeBuilder<'a> {
 		FlowControl::Break
 	}
 
-	fn visit_elseif_stmt(&mut self, stmt: &'a IfStmt<'a>) -> FlowControl {
+	fn visit_elseif_stmt(&mut self, stmt: &IfStmt) -> FlowControl {
 		let starting_scope = self.spawn_for_block(&stmt.then_branch);
 		self.current = Arc::clone(&starting_scope);
 
@@ -201,7 +201,7 @@ impl<'a> Visitor<'a> for ScopeBuilder<'a> {
 		FlowControl::Break
 	}
 
-	fn visit_else_stmt(&mut self, stmt: &'a ElseStmt<'a>) -> FlowControl {
+	fn visit_else_stmt(&mut self, stmt: &ElseStmt) -> FlowControl {
 		let starting_scope = self.spawn_for_block(&stmt.body);
 		self.current = Arc::clone(&starting_scope);
 
@@ -217,13 +217,17 @@ impl<'a> Visitor<'a> for ScopeBuilder<'a> {
 
 	// --- For statement ------------------------------------------------------------------
 
-	fn visit_for_stmt(&mut self, stmt: &'a ForStmt<'a>) -> FlowControl {
+	fn visit_for_stmt(&mut self, stmt: &ForStmt) -> FlowControl {
 		if let Some(init) = stmt.initializer.as_ref() {
 			// Create a new scope from the initializer's semicolon through the end of the
 			// statement body, and then walk the initializer
 			let start = match init.as_ref() {
 				Stmt::Expr(expr) => expr.semicolon.span().end,
-				Stmt::Empty(semicolon @ Token::Punct(";", _)) => semicolon.span().end,
+				Stmt::Empty(token)
+					if matches!(token.as_matchable(), (TokenKind::Punct, ";", _)) =>
+				{
+					token.span().end
+				}
 				// This will be unreachable with well-formed input, but to avoid crashing the
 				// server unnecessarily we'll just bail instead of asserting
 				_ => return FlowControl::Break,
@@ -258,7 +262,7 @@ impl<'a> Visitor<'a> for ScopeBuilder<'a> {
 
 	// --- Loop / Continuing --------------------------------------------------------------
 
-	fn visit_loop_stmt(&mut self, stmt: &'a LoopStmt<'a>) -> FlowControl {
+	fn visit_loop_stmt(&mut self, stmt: &LoopStmt) -> FlowControl {
 		let starting_scope = self.spawn_for_block(&stmt.body);
 		self.current = Arc::clone(&starting_scope);
 
@@ -272,7 +276,7 @@ impl<'a> Visitor<'a> for ScopeBuilder<'a> {
 		FlowControl::Break
 	}
 
-	fn visit_continuing_stmt(&mut self, stmt: &'a ContinuingStmt<'a>) -> FlowControl {
+	fn visit_continuing_stmt(&mut self, stmt: &ContinuingStmt) -> FlowControl {
 		let starting_scope = self.spawn_for_block(&stmt.body);
 		self.current = Arc::clone(&starting_scope);
 
@@ -288,7 +292,7 @@ impl<'a> Visitor<'a> for ScopeBuilder<'a> {
 
 	// --- Case statements ----------------------------------------------------------------
 
-	fn visit_case_stmt(&mut self, stmt: &'a CaseStmt<'a>) -> FlowControl {
+	fn visit_case_stmt(&mut self, stmt: &CaseStmt) -> FlowControl {
 		let starting_scope = self.spawn_for_block(&stmt.body);
 		self.current = Arc::clone(&starting_scope);
 

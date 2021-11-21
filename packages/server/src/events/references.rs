@@ -3,11 +3,11 @@ use std::sync::Arc;
 use gramatika::{Spanned, Token as _};
 use lsp_server::{Message, RequestId, Response};
 use lsp_types::{Location, Position, ReferenceParams, Url};
-use parser_v2::{decl::Decl, utils::ToRange, Token};
+use parser_v2::{decl::Decl, utils::ToRange, Token, TokenKind};
 use serde_json as json;
 use wgsl_plus::ResolveImportPath;
 
-use crate::documents_v2::Documents;
+use crate::documents::Documents;
 
 pub fn handle(id: RequestId, params: ReferenceParams, docs: &Documents) -> Message {
 	let uri = &params.text_document_position.text_document.uri;
@@ -37,7 +37,7 @@ pub fn find_all(
 		pos >= range.start && pos <= range.end
 	})?;
 
-	let found = docs.find_decl(uri.clone(), *needle)?;
+	let found = docs.find_decl(uri, needle)?;
 	let needle_decl = found.decl;
 
 	let storage_modifier = match needle_decl.as_ref() {
@@ -49,12 +49,15 @@ pub fn find_all(
 	let mut references = Vec::with_capacity(8);
 
 	// If the declaration is an export, we need to check all dependent documents for references
-	if matches!(storage_modifier, Some(Token::Keyword("export", _))) {
+	if matches!(
+		storage_modifier.map(|t| t.as_matchable()),
+		Some((TokenKind::Keyword, "export", _))
+	) {
 		// The "Find references" command could be invoked on an imported reference in one of
 		// the dependent documents, so we need to be sure of the source URI
 		let uri = if let Some(decl) = found.source_module {
 			match decl.as_ref() {
-				Decl::Module(module) => uri.resolve_import(module.path()),
+				Decl::Module(module) => uri.resolve_import(module.path().as_str()),
 				_ => unreachable!(),
 			}
 		} else {
@@ -115,27 +118,27 @@ pub fn find_all(
 	Some(references)
 }
 
-trait IsReference<'a> {
+trait IsReference {
 	fn is_reference(
 		&self,
-		needle: &Token<'a>,
-		needle_decl: &Decl<'a>,
+		needle: &Token,
+		needle_decl: &Decl,
 		uri: &Url,
-		docs: &Documents<'a>,
+		docs: &Documents,
 		include_decl: bool,
 		scope_predicate: impl Fn(&Token) -> bool,
 	) -> bool;
 
-	fn is_declaration(&self, decl: &Decl<'a>) -> bool;
+	fn is_declaration(&self, decl: &Decl) -> bool;
 }
 
-impl<'a> IsReference<'a> for Token<'a> {
+impl IsReference for Token {
 	fn is_reference(
 		&self,
-		needle: &Token<'a>,
-		needle_decl: &Decl<'a>,
+		needle: &Token,
+		needle_decl: &Decl,
 		uri: &Url,
-		docs: &Documents<'a>,
+		docs: &Documents,
 		include_decl: bool,
 		scope_predicate: impl Fn(&Token) -> bool,
 	) -> bool {
@@ -145,13 +148,13 @@ impl<'a> IsReference<'a> for Token<'a> {
 
 		self.lexeme() == needle.lexeme()
 			&& scope_predicate(self)
-			&& match docs.find_decl(uri.clone(), *self) {
+			&& match docs.find_decl(uri, self) {
 				Some(found) => found.decl.span() == needle_decl.span(),
 				None => false,
 			}
 	}
 
-	fn is_declaration(&self, decl: &Decl<'a>) -> bool {
+	fn is_declaration(&self, decl: &Decl) -> bool {
 		self.span() == decl.name().span()
 	}
 }

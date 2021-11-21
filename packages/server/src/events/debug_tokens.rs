@@ -2,16 +2,18 @@ use lsp_server::{Message, RequestId, Response};
 use parser_v2::Token;
 use serde_json as json;
 
-use crate::{documents_v2::Documents, lsp_extensions::DebugDocumentParams};
+use crate::{documents::Documents, lsp_extensions::DebugDocumentParams};
 
 #[derive(DebugLisp)]
-struct TokensPrinter<'a> {
-	inner: Vec<Token<'a>>,
+struct TokensPrinter {
+	inner: Vec<Token>,
 }
 
-impl<'a> TokensPrinter<'a> {
-	fn new(tokens: Vec<Token<'a>>) -> Self {
-		Self { inner: tokens }
+impl TokensPrinter {
+	fn new(tokens: &[Token]) -> Self {
+		Self {
+			inner: tokens.into(),
+		}
 	}
 }
 
@@ -21,8 +23,8 @@ pub fn handle(id: RequestId, params: DebugDocumentParams, docs: &Documents) -> M
 	let result = docs
 		.get(&uri)
 		.map(|document| {
-			let printer = TokensPrinter::new(document.tokens.clone());
-			format!("{:#?}", printer)
+			let printer = TokensPrinter::new(&document.tokens);
+			std::format!("{:#?}", printer)
 		})
 		.unwrap_or_else(|| "".into());
 
