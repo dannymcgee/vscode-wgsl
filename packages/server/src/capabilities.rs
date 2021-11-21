@@ -24,7 +24,7 @@ pub fn define() -> json::Value {
 		})),
 		definition_provider: Some(OneOf::Left(true)),
 		text_document_sync: Some(TextDocumentSyncCapability::Kind(
-			TextDocumentSyncKind::Incremental,
+			TextDocumentSyncKind::INCREMENTAL,
 		)),
 		references_provider: Some(OneOf::Left(true)),
 		code_lens_provider: Some(CodeLensOptions {

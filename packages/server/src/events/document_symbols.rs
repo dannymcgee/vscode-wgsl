@@ -89,32 +89,32 @@ impl AsSymbol for Decl {
 		match self {
 			Var(ref inner) => Some(
 				builder
-					.kind(SymbolKind::Variable)
+					.kind(SymbolKind::VARIABLE)
 					.detail(inner.detail())
 					.build(),
 			),
 			Const(ref inner) => Some(
 				builder
-					.kind(SymbolKind::Constant)
+					.kind(SymbolKind::CONSTANT)
 					.detail(inner.detail())
 					.build(),
 			),
 			TypeAlias(ref inner) => Some(
 				builder
-					.kind(SymbolKind::TypeParameter)
+					.kind(SymbolKind::TYPE_PARAMETER)
 					.detail(Some(&inner.value))
 					.build(),
 			),
 			Struct(ref inner) => Some(
 				builder
-					.kind(SymbolKind::Struct)
+					.kind(SymbolKind::STRUCT)
 					.detail(inner.detail())
 					.children(inner.body.into_symbols())
 					.build(),
 			),
 			Function(ref inner) => Some(
 				builder
-					.kind(SymbolKind::Function)
+					.kind(SymbolKind::FUNCTION)
 					.detail(inner.detail())
 					.build(),
 			),
@@ -128,7 +128,7 @@ impl IntoSymbols for &Vec<FieldDecl> {
 		self.iter()
 			.map(|field| {
 				DocSymBuilder::new()
-					.kind(SymbolKind::Field)
+					.kind(SymbolKind::FIELD)
 					.name(&field.name)
 					.detail(Some(&field.ty))
 					.range(field.span().to_range())
@@ -150,7 +150,7 @@ impl IntoSymbols for &StructBody {
 					unreachable!()
 				};
 				DocSymBuilder::new()
-					.kind(SymbolKind::Field)
+					.kind(SymbolKind::FIELD)
 					.name(&field.name)
 					.detail(Some(&field.ty))
 					.range(field.span().to_range())
