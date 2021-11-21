@@ -24,6 +24,7 @@ impl Tooltip for Decl {
 			Param(inner) => Tooltip::fmt(inner, f),
 			Extension(inner) => Tooltip::fmt(inner, f),
 			Module(inner) => Tooltip::fmt(inner, f),
+			Error(err) => fmt::Display::fmt(err, f),
 		}
 	}
 }

@@ -21,16 +21,18 @@ mod document;
 mod finder;
 
 use crate::lsp_extensions::{UnreadDependency, UnreadDependencyParams};
+
 pub use document::Document;
 use finder::DeclFinder;
 pub use finder::FindDeclResult;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Status {
 	Ready,
 	Pending,
 }
 
+#[derive(Debug)]
 pub struct Documents {
 	documents: Arc<DashMap<Url, Document>>,
 	pending: Arc<DashSet<Url>>,
@@ -60,6 +62,10 @@ impl Documents {
 		let text = params.text_document.text;
 		let doc = Document::new(text, uri.clone())?;
 
+		if doc.status == Status::Ready {
+			doc.validate();
+		}
+
 		self.documents.insert(uri, doc);
 		self.update_status();
 
@@ -72,6 +78,10 @@ impl Documents {
 		let uri = params.text_document.uri.clone();
 		if let Some(mut doc) = self.documents.get_mut(&uri) {
 			doc.update(params).unwrap();
+
+			if doc.status == Status::Ready {
+				doc.validate();
+			}
 		}
 
 		self.update_status();
@@ -112,6 +122,7 @@ impl Documents {
 			if unresolved_deps.is_empty() {
 				// Update this document's status if all of its dependencies are resolved
 				document.status = Status::Ready;
+				document.validate();
 			} else {
 				// Set our "accumulator" to Pending
 				accum = Status::Pending;
@@ -173,6 +184,17 @@ impl Documents {
 		tree.walk(&mut finder);
 
 		finder.result()
+	}
+}
+
+impl Clone for Documents {
+	fn clone(&self) -> Self {
+		Self {
+			documents: Arc::clone(&self.documents),
+			pending: Arc::clone(&self.pending),
+			ipc: self.ipc.clone(),
+			status_tx: self.status_tx.clone(),
+		}
 	}
 }
 

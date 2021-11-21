@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use gramatika::{Parse, ParseStreamer, Span, Spanned, SpannedError, Substr, Token as _};
+use lazy_static::lazy_static;
 
 use crate::{
 	common::{AttributeList, TypeDecl},
@@ -20,6 +21,7 @@ pub enum Decl {
 	Param(ParamDecl),
 	Extension(ExtensionDecl),
 	Module(ModuleDecl),
+	Error(SpannedError),
 }
 
 #[derive(Clone, DebugLisp)]
@@ -100,6 +102,11 @@ pub struct ModuleDecl {
 	pub semicolon: Token,
 }
 
+lazy_static! {
+	// FIXME: This is gross -- is there a better way to handle this?
+	static ref ERR_TOKEN: Token = Token::Ident(literal_substr!("ERROR"), span!(0:0...0:0));
+}
+
 impl Decl {
 	pub fn name(&self) -> &Token {
 		match self {
@@ -111,6 +118,7 @@ impl Decl {
 			Decl::Param(decl) => &decl.name,
 			Decl::Extension(decl) => &decl.name,
 			Decl::Module(decl) => &decl.name,
+			Decl::Error(_) => &ERR_TOKEN,
 		}
 	}
 
@@ -125,6 +133,7 @@ impl Decl {
 			Decl::Param(decl) => decl.attributes.as_ref(),
 			Decl::Extension(_) => None,
 			Decl::Module(_) => None,
+			Decl::Error(_) => None,
 		}
 	}
 }
@@ -138,7 +147,18 @@ impl Parse for Decl {
 		match input.peek() {
 			Some(token) => match token.as_matchable() {
 				(Brace, "[[", _) => {
-					let attributes = Some(input.parse::<AttributeList>()?);
+					let attributes = match input.parse::<AttributeList>() {
+						Ok(attr) => Some(attr),
+						Err(err) => {
+							while !input.check(brace!["]]"]) {
+								input.discard();
+							}
+							if !input.is_empty() {
+								input.consume(brace!["]]"]).unwrap();
+							}
+							return Ok(Decl::Error(err));
+						}
+					};
 
 					match input.parse::<Decl>()? {
 						Decl::Var(mut inner) => {
@@ -201,6 +221,7 @@ impl Spanned for Decl {
 			Param(inner) => inner.span(),
 			Extension(inner) => inner.span(),
 			Module(inner) => inner.span(),
+			Error(inner) => inner.span.unwrap_or_default(),
 		}
 	}
 }

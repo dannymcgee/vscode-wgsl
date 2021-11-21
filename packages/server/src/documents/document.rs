@@ -10,7 +10,9 @@ use parser_v2::{
 use ropey::Rope;
 
 use super::{DependencyResolver, Status};
+use crate::diagnostics::Diagnostics;
 
+#[derive(Debug)]
 pub struct Document {
 	pub uri: Arc<Url>,
 	pub source: ArcStr,
@@ -66,6 +68,7 @@ impl Document {
 		}
 
 		let (ast, source, tokens) = super::parse(source.to_string())?;
+
 		self.source = source;
 		self.tokens = tokens.into();
 		self.deps = DependencyResolver::resolve(&ast, &self.uri);
@@ -79,6 +82,10 @@ impl Document {
 		};
 
 		Ok(())
+	}
+
+	pub(super) fn validate(&self) {
+		Diagnostics::global().validate(self);
 	}
 }
 

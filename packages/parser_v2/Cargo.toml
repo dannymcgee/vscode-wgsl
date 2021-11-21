@@ -5,7 +5,8 @@ edition = "2018"
 
 [dependencies]
 itertools = "*"
-gramatika = "0.4.2"
+gramatika = "0.4.3"
+lazy_static = "*"
 lsp-types = "0.91"
 parking_lot = "0.11"
 

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use gramatika::{Parse, ParseStreamer, Span, Spanned, SpannedError, Token as _};
 
 use crate::{
@@ -8,7 +10,7 @@ use crate::{
 #[derive(Clone, DebugLisp)]
 pub struct AttributeList {
 	pub open_brace: Token,
-	pub attributes: Vec<Attribute>,
+	pub attributes: Arc<[Attribute]>,
 	pub close_brace: Token,
 }
 
@@ -31,7 +33,7 @@ pub struct TypeDecl {
 #[derive(Clone, DebugLisp)]
 pub struct ArgumentList {
 	pub brace_open: Token,
-	pub arguments: Vec<Expr>,
+	pub arguments: Arc<[Expr]>,
 	pub brace_close: Token,
 }
 
@@ -77,7 +79,7 @@ impl Parse for AttributeList {
 
 		Ok(Self {
 			open_brace,
-			attributes,
+			attributes: attributes.into(),
 			close_brace,
 		})
 	}
@@ -97,15 +99,28 @@ impl Parse for Attribute {
 	type Stream = ParseStream;
 
 	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
-		// TODO - see note in `tokens`
+		use TokenKind::*;
+
 		let name = input.consume_as(TokenKind::Ident, Token::attribute)?;
 		let value = if input.check(brace!["("]) {
 			input.consume(brace!["("])?;
-			let value = input.next().ok_or_else(|| SpannedError {
-				message: "Unexpected end of input".into(),
-				source: input.source(),
-				span: None,
-			})?;
+
+			let value = match input.next() {
+				Some(token) => match token.kind() {
+					Ident | Keyword | IntLiteral | UintLiteral | FloatLiteral => Ok(token),
+					_ => Err(SpannedError {
+						message: "Expected literal or identifier".into(),
+						source: input.source(),
+						span: Some(token.span()),
+					}),
+				},
+				None => Err(SpannedError {
+					message: "Unexpected end of input".into(),
+					source: input.source(),
+					span: input.prev().map(|token| token.span()),
+				}),
+			}?;
+
 			input.consume(brace![")"])?;
 
 			Some(value)
@@ -278,7 +293,7 @@ impl Parse for ArgumentList {
 
 		Ok(Self {
 			brace_open,
-			arguments,
+			arguments: arguments.into(),
 			brace_close,
 		})
 	}

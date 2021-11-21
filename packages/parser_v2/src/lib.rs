@@ -27,10 +27,27 @@ impl Parse for SyntaxTree {
 
 	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
 		let mut inner = vec![];
+		let mut recovering = false;
+
 		while !input.is_empty() {
 			match input.peek().unwrap() {
 				Token::Comment(_, _) => input.discard(),
-				_ => inner.push(input.parse::<Decl>()?),
+				_ => match input.parse::<Decl>() {
+					Ok(decl) => {
+						if recovering {
+							recovering = false;
+						}
+						inner.push(decl);
+					}
+					Err(err) => {
+						if recovering {
+							input.discard();
+						} else {
+							inner.push(Decl::Error(err));
+							recovering = true;
+						}
+					}
+				},
 			}
 		}
 

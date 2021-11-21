@@ -1,3 +1,4 @@
+use diagnostics::Diagnostics;
 use lsp_server::{Connection, Message};
 use lsp_types::InitializeParams;
 use serde_json as json;
@@ -9,9 +10,7 @@ extern crate gramatika;
 
 mod capabilities;
 mod diagnostics;
-// mod diagnostics_old;
 mod documents;
-// mod documents_old;
 mod events;
 mod lsp_extensions;
 
@@ -22,9 +21,6 @@ fn main() -> Result<(), Error> {
 	let capabilities = capabilities::define();
 	let init_params = cx.initialize(capabilities)?;
 
-	// unsafe {
-	// 	diagnostics_old::bootstrap(cx.sender.clone());
-	// }
 	main_loop(&cx, init_params)?;
 
 	io_threads.join()?;
@@ -38,6 +34,7 @@ fn main_loop(cx: &Connection, params: json::Value) -> anyhow::Result<()> {
 	let rx = cx.receiver.clone();
 	let tx = cx.sender.clone();
 
+	let handle = Diagnostics::init(tx.clone());
 	let dispatcher = events::Dispatcher::new(tx);
 
 	for msg in rx {
@@ -47,6 +44,8 @@ fn main_loop(cx: &Connection, params: json::Value) -> anyhow::Result<()> {
 			_ => unreachable!(),
 		}
 	}
+
+	handle.join().unwrap();
 
 	Ok(())
 }

@@ -23,6 +23,7 @@ pub enum Stmt {
 	Fallthrough(KeywordStmt),
 	Expr(ExprStmt),
 	Empty(Token),
+	Error(SpannedError),
 }
 
 #[derive(Clone, DebugLisp)]
@@ -125,7 +126,7 @@ impl Parse for Stmt {
 	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
 		use TokenKind::*;
 
-		match input.peek() {
+		let result = match input.peek() {
 			#[rustfmt::skip]
 			Some(token) => match token.as_matchable() {
 				(Keyword, "return", _)      => Ok(Stmt::Return(input.parse()?)),
@@ -146,8 +147,13 @@ impl Parse for Stmt {
 			None => Err(SpannedError {
 				message: "Unexpected end of input".into(),
 				source: input.source(),
-				span: None,
+				span: input.prev().map(|token| token.span()),
 			}),
+		};
+
+		match result {
+			Ok(stmt) => Ok(stmt),
+			Err(err) => Ok(Stmt::Error(err)),
 		}
 	}
 }
@@ -171,6 +177,7 @@ impl Spanned for Stmt {
 			Fallthrough(inner) => inner.span(),
 			Expr(inner) => inner.span(),
 			Empty(inner) => inner.span(),
+			Error(inner) => inner.span.unwrap_or_default(),
 		}
 	}
 }

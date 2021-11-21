@@ -35,18 +35,20 @@ impl SemanticTokensBuilder {
 
 impl Visitor for SemanticTokensBuilder {
 	fn visit_decl(&mut self, decl: &Decl) -> FlowControl {
-		let (ttype, tmod): (TokenType, TokenMod) = match decl {
-			Decl::Var(_) => (TokenType::Variable, TokenMod::DECL),
-			Decl::Const(_) => (TokenType::Variable, TokenMod::DECL | TokenMod::READONLY),
-			Decl::TypeAlias(_) => (TokenType::Type, TokenMod::DECL),
-			Decl::Struct(_) => (TokenType::Struct, TokenMod::DECL),
-			Decl::Field(_) => (TokenType::Property, TokenMod::DECL),
-			Decl::Function(_) => (TokenType::Function, TokenMod::DECL),
-			Decl::Param(_) => (TokenType::Parameter, TokenMod::DECL),
-			Decl::Extension(_) => (TokenType::Namespace, TokenMod::DECL),
-			Decl::Module(_) => (TokenType::Namespace, TokenMod::DECL),
-		};
-		self.result.insert(decl.name().clone(), (ttype, tmod));
+		if let Some((ttype, tmod)) = match decl {
+			Decl::Var(_) => Some((TokenType::Variable, TokenMod::DECL)),
+			Decl::Const(_) => Some((TokenType::Variable, TokenMod::DECL | TokenMod::READONLY)),
+			Decl::TypeAlias(_) => Some((TokenType::Type, TokenMod::DECL)),
+			Decl::Struct(_) => Some((TokenType::Struct, TokenMod::DECL)),
+			Decl::Field(_) => Some((TokenType::Property, TokenMod::DECL)),
+			Decl::Function(_) => Some((TokenType::Function, TokenMod::DECL)),
+			Decl::Param(_) => Some((TokenType::Parameter, TokenMod::DECL)),
+			Decl::Extension(_) => Some((TokenType::Namespace, TokenMod::DECL)),
+			Decl::Module(_) => Some((TokenType::Namespace, TokenMod::DECL)),
+			Decl::Error(_) => None,
+		} {
+			self.result.insert(decl.name().clone(), (ttype, tmod));
+		}
 
 		FlowControl::Continue
 	}
@@ -167,15 +169,16 @@ impl Visitor for SemanticTokensBuilder {
 			let sem_tok = self
 				.scopes
 				.find_decl(token)
-				.map(|decl| match decl.as_ref() {
-					Decl::Struct(_) => (TokenType::Struct, TokenMod::NONE),
-					Decl::TypeAlias(_) => (TokenType::Type, TokenMod::NONE),
-					Decl::Function(_) => (TokenType::Function, TokenMod::NONE),
-					Decl::Var(_) => (TokenType::Variable, TokenMod::NONE),
-					Decl::Const(_) => (TokenType::Variable, TokenMod::READONLY),
-					Decl::Param(_) => (TokenType::Parameter, TokenMod::NONE),
-					Decl::Extension(_) => (TokenType::Namespace, TokenMod::NONE),
-					Decl::Module(_) => (TokenType::Namespace, TokenMod::NONE),
+				.and_then(|decl| match decl.as_ref() {
+					Decl::Struct(_) => Some((TokenType::Struct, TokenMod::NONE)),
+					Decl::TypeAlias(_) => Some((TokenType::Type, TokenMod::NONE)),
+					Decl::Function(_) => Some((TokenType::Function, TokenMod::NONE)),
+					Decl::Var(_) => Some((TokenType::Variable, TokenMod::NONE)),
+					Decl::Const(_) => Some((TokenType::Variable, TokenMod::READONLY)),
+					Decl::Param(_) => Some((TokenType::Parameter, TokenMod::NONE)),
+					Decl::Extension(_) => Some((TokenType::Namespace, TokenMod::NONE)),
+					Decl::Module(_) => Some((TokenType::Namespace, TokenMod::NONE)),
+					Decl::Error(_) => None,
 					// Field declarations are not directly represented in the scope tree
 					Decl::Field(_) => unreachable!(),
 				});

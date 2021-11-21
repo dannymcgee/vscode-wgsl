@@ -1,4 +1,4 @@
-use gramatika::Token as _;
+use gramatika::{SpannedError, Token as _};
 
 use crate::{
 	common::{AttributeList, TypeDecl},
@@ -64,6 +64,8 @@ pub trait Visitor {
 	#[must_use] fn visit_postfix_expr(&mut self, expr: &PostfixExpr) -> FlowControl { FlowControl::Continue }
 	fn visit_literal_expr(&mut self, expr: &Token) {}
 	fn visit_ident_expr(&mut self, expr: &IdentExpr) {}
+
+	fn visit_error(&mut self, expr: &SpannedError) {}
 }
 
 pub trait Walk {
@@ -94,6 +96,7 @@ impl Walk for Decl {
 				Param(decl) => decl.walk(visitor),
 				Extension(decl) => decl.walk(visitor),
 				Module(decl) => decl.walk(visitor),
+				Error(err) => visitor.visit_error(err),
 			}
 		}
 	}
@@ -196,6 +199,7 @@ impl Walk for Stmt {
 				For(stmt) => stmt.walk(visitor),
 				Var(decl) => decl.walk(visitor),
 				Expr(stmt) => stmt.walk(visitor),
+				Error(err) => visitor.visit_error(err),
 				_ => {}
 			}
 		}
@@ -333,6 +337,7 @@ impl Walk for Expr {
 				Literal(expr) => visitor.visit_literal_expr(expr),
 				Ident(expr) => visitor.visit_ident_expr(expr),
 				Primary(expr) => expr.walk(visitor),
+				Error(err) => visitor.visit_error(err),
 			};
 		}
 	}

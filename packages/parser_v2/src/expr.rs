@@ -19,6 +19,7 @@ pub enum Expr {
 	Literal(Token),
 	Ident(IdentExpr),
 	Primary(PrimaryExpr),
+	Error(SpannedError),
 }
 
 #[derive(Clone, DebugLisp)]
@@ -145,6 +146,7 @@ impl Spanned for Expr {
 			Expr::Literal(inner) => inner.span(),
 			Expr::Ident(inner) => inner.span(),
 			Expr::Primary(inner) => inner.span(),
+			Expr::Error(err) => err.span.unwrap_or_default(),
 		}
 	}
 }
@@ -186,7 +188,10 @@ impl Parse for Expr {
 	type Stream = ParseStream;
 
 	fn parse(input: &mut Self::Stream) -> Result<Self> {
-		input.assignment()
+		match input.assignment() {
+			Ok(expr) => Ok(expr),
+			Err(err) => Ok(Expr::Error(err)),
+		}
 	}
 }
 
@@ -233,7 +238,7 @@ impl Parse for PrimaryExprBuilder {
 			None => Err(SpannedError {
 				message: "Unexpected end of input".into(),
 				source: input.source(),
-				span: None,
+				span: input.prev().map(|token| token.span()),
 			}),
 		}?;
 

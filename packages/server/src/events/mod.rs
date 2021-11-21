@@ -119,7 +119,6 @@ impl Dispatcher {
 	}
 
 	fn subscribe(self, status: Receiver<Status>) {
-		// TODO: This would probably be way more efficient to do with async/await
 		thread::spawn(move || {
 			for update in status {
 				if update == Status::Ready {
