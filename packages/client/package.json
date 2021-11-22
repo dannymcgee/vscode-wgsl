@@ -8,7 +8,7 @@
 	"publisher": "dannymcgee",
 	"license": "MIT",
 	"engines": {
-		"vscode": "^1.52.0"
+		"vscode": "^1.61.0"
 	},
 	"repository": {
 		"types": "git",

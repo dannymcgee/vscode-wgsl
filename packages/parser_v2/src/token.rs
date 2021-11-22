@@ -9,6 +9,7 @@ pub enum Token {
 	#[pattern = r"\[\[?|\]\]?|[(){}]"]
 	Brace(Substr, Span),
 
+	#[discard]
 	#[pattern = "//.*"]
 	Comment(Substr, Span),
 

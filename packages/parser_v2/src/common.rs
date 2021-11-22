@@ -25,9 +25,10 @@ pub struct TypeDecl {
 	pub annotator: Option<Token>,
 	pub attributes: Option<AttributeList>,
 	pub name: IdentExpr,
-	pub child_ty: Option<Token>,
+	pub child_ty: Option<Arc<TypeDecl>>,
 	pub storage_class: Option<Token>,
 	pub access_mode: Option<Token>,
+	pub element_count: Option<Token>,
 }
 
 #[derive(Clone, DebugLisp)]
@@ -137,9 +138,10 @@ struct TypeDeclBuilder {
 	attributes: Option<AttributeList>,
 	annotator: Option<Token>,
 	name: Option<IdentExpr>,
-	child_ty: Option<Token>,
+	child_ty: Option<Arc<TypeDecl>>,
 	storage_class: Option<Token>,
 	access_mode: Option<Token>,
+	element_count: Option<Token>,
 }
 
 impl TypeDeclBuilder {
@@ -158,8 +160,8 @@ impl TypeDeclBuilder {
 		self.name = Some(name);
 		self
 	}
-	fn child_ty(&mut self, child_ty: Token) -> &mut Self {
-		self.child_ty = Some(child_ty);
+	fn child_ty(&mut self, child_ty: TypeDecl) -> &mut Self {
+		self.child_ty = Some(Arc::new(child_ty));
 		self
 	}
 	fn storage_class(&mut self, storage_class: Token) -> &mut Self {
@@ -170,6 +172,10 @@ impl TypeDeclBuilder {
 		self.access_mode = Some(access_mode);
 		self
 	}
+	fn element_count(&mut self, element_count: Token) -> &mut Self {
+		self.element_count = Some(element_count);
+		self
+	}
 	fn build(self) -> TypeDecl {
 		TypeDecl {
 			annotator: self.annotator,
@@ -178,6 +184,7 @@ impl TypeDeclBuilder {
 			child_ty: self.child_ty,
 			storage_class: self.storage_class,
 			access_mode: self.access_mode,
+			element_count: self.element_count,
 		}
 	}
 }
@@ -217,9 +224,11 @@ impl Parse for TypeDecl {
 			builder.attributes(input.parse()?);
 		}
 		if input.check_kind(TokenKind::Type) {
+			let name = input.next().unwrap();
+
 			builder.name(IdentExpr {
 				namespace: None,
-				name: input.next().unwrap(),
+				name: name.clone(),
 			});
 
 			if input.check(operator![<]) {
@@ -227,21 +236,26 @@ impl Parse for TypeDecl {
 
 				while !input.check(operator![>]) {
 					#[rustfmt::skip]
-					match input.next() {
+					match input.peek() {
 						Some(token) => match token.as_matchable() {
 							(Type | Ident, _, _) => {
-								builder.child_ty(token);
+								builder.child_ty(input.parse()?);
 							}
 							(Keyword, "function" | "private" | "workgroup" | "uniform" | "storage", _) => {
-								builder.storage_class(token);
+								builder.storage_class(input.next().unwrap());
 							}
 							(Keyword, "read" | "write" | "read_write", _) => {
-								builder.access_mode(token);
+								builder.access_mode(input.next().unwrap());
 							}
-							(Punct, ",", _) => {},
+							(Punct, ",", _) => {
+								input.discard();
+							},
+							(UintLiteral, _, _) if name.lexeme().as_str() == "array" => {
+								builder.element_count(input.next().unwrap());
+							}
 							(_, _, span) => {
 								return Err(SpannedError {
-									message: "Expected type, storage class, access mode, or texel format"
+									message: "Expected type, storage class, access mode, texel format, or element count"
 										.into(),
 									source: input.source(),
 									span: Some(span),

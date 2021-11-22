@@ -407,8 +407,7 @@ dependencies = [
 [[package]]
 name = "gramatika"
 version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58185b0986e91dfc50cc46c4d75c0154e2479a18929376d4f935e09164860358"
+source = "git+https://github.com/dannymcgee/gramatika.git?branch=main#088e5e5e8753602ee02e7ed16e17fcee396d956c"
 dependencies = [
  "arcstr",
  "gramatika-macro",
@@ -419,8 +418,7 @@ dependencies = [
 [[package]]
 name = "gramatika-macro"
 version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df77b46e253ec127be991abe81514b49322d64b0893c40a6cea74efedf75fffe"
+source = "git+https://github.com/dannymcgee/gramatika.git?branch=main#088e5e5e8753602ee02e7ed16e17fcee396d956c"
 dependencies = [
  "anyhow",
  "arcstr",

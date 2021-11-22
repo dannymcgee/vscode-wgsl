@@ -5,10 +5,13 @@ edition = "2018"
 
 [dependencies]
 itertools = "*"
-gramatika = "0.4.3"
 lazy_static = "*"
 lsp-types = "0.91"
 parking_lot = "0.11"
+
+[dependencies.gramatika]
+git = "https://github.com/dannymcgee/gramatika.git"
+branch = "main"
 
 [dev-dependencies]
 parser = { path = "../parser" }

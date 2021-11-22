@@ -74,6 +74,7 @@ impl IntoDiagnostics for WithSpan<NagaValidationError> {
 				DiagnosticBuilder::new(kind)
 					.range(span.as_range(Some(&doc.source)))
 					.severity(DiagnosticSeverity::ERROR)
+					.source("naga::validation")
 					.message(message.clone())
 					.build()
 			})
@@ -110,6 +111,7 @@ impl IntoDiagnostics for NagaParseError {
 		vec![DiagnosticBuilder::new(kind)
 			.range(full_span.as_range(None))
 			.severity(DiagnosticSeverity::ERROR)
+			.source("naga::parse")
 			.message(std::format!("ParseError: {}", self))
 			.build()]
 	}

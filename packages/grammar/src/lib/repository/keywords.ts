@@ -32,7 +32,7 @@ export const keyword: TMGrammarScope = {
 			name: "entity.name.type.wgsl",
 		},
 		{
-			match: /\b(sampler)\b/,
+			match: /\b(sampler|array)\b/,
 			name: "entity.name.type.wgsl",
 		},
 	],

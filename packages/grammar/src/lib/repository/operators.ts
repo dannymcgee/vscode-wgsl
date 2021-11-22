@@ -9,7 +9,7 @@ export const operator: TMGrammarScope = {
 		{
 			name: "keyword.operator.wgsl",
 			// eslint-disable-next-line no-useless-escape
-			match: /[-+*\/&|=<>]/,
+			match: /[-+*\/%&|^~=<>]/,
 		},
 	],
 };

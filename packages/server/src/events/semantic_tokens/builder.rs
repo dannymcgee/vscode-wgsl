@@ -58,16 +58,15 @@ impl Visitor for SemanticTokensBuilder {
 		// type here. We also mark the parent type as a built-in struct (struct because it
 		// has fields, and built-in because it's not currently possible for users to define
 		// generic types).
-		if let Some(ref token) = decl.child_ty {
+		if let Some(ty) = decl.child_ty.as_ref() {
 			self.result.insert(
 				decl.name.name.clone(),
 				(TokenType::Struct, TokenMod::BUILTIN),
 			);
-			self.result
-				.insert(token.clone(), (TokenType::Type, TokenMod::BUILTIN));
 
-			// Avoid trying to re-visit the ident expression
-			FlowControl::Break
+			// To avoid re-visiting the ident, we recursively visit the child type
+			// instead of directly returning FlowControl::Continue here
+			self.visit_type(ty.as_ref())
 		} else {
 			FlowControl::Continue
 		}

@@ -22,12 +22,17 @@ class Context implements ExtensionContext {
 	get extensionPath() { return this.inner.extensionPath }
 	get environmentVariableCollection() { return this.inner.environmentVariableCollection }
 	get storageUri() { return this.inner.storageUri }
+	/** @deprecated */
 	get storagePath() { return this.inner.storagePath }
 	get globalStorageUri() { return this.inner.globalStorageUri }
+	/** @deprecated */
 	get globalStoragePath() { return this.inner.globalStoragePath }
 	get logUri() { return this.inner.logUri }
+	/** @deprecated */
 	get logPath() { return this.inner.logPath }
 	get extensionMode() { return this.inner.extensionMode }
+	get secrets() { return this.inner.secrets }
+	get extension() { return this.inner.extension }
 
 	get asAbsolutePath() { return this.inner.asAbsolutePath }
 }

@@ -10,6 +10,7 @@ pub(super) struct DiagnosticBuilder {
 	kind: ErrorKind,
 	range: Option<Range>,
 	severity: Option<DiagnosticSeverity>,
+	source: Option<String>,
 	message: Option<String>,
 	related_information: Option<Vec<DiagnosticRelatedInformation>>,
 	tags: Option<Vec<DiagnosticTag>>,
@@ -21,6 +22,7 @@ impl DiagnosticBuilder {
 			kind,
 			range: None,
 			severity: None,
+			source: None,
 			message: None,
 			related_information: None,
 			tags: None,
@@ -34,6 +36,12 @@ impl DiagnosticBuilder {
 
 	pub(super) fn severity(mut self, severity: DiagnosticSeverity) -> Self {
 		self.severity = Some(severity);
+		self
+	}
+
+	pub(super) fn source<S>(mut self, source: S) -> Self
+	where S: ToString {
+		self.source = Some(source.to_string());
 		self
 	}
 
@@ -61,7 +69,7 @@ impl DiagnosticBuilder {
 			severity: self.severity,
 			code: None,
 			code_description: None,
-			source: Some("wgsl".into()),
+			source: self.source.or_else(|| Some("vscode-wgsl".into())),
 			message: self.message.expect("message field is uninitialized!"),
 			related_information: self.related_information,
 			tags: self.tags,

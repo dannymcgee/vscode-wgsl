@@ -439,6 +439,10 @@ impl Walk for TypeDecl {
 				visitor.visit_attributes(attributes);
 			}
 
+			if let Some(ref ty) = self.child_ty {
+				ty.walk(visitor);
+			}
+
 			visitor.visit_ident_expr(&self.name);
 		}
 	}
