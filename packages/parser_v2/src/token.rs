@@ -13,6 +13,10 @@ pub enum Token {
 	#[pattern = "//.*"]
 	Comment(Substr, Span),
 
+	#[discard]
+	#[pattern = "#.*"]
+	Pragma(Substr, Span),
+
 	#[subset_of(Ident)]
 	#[pattern = r"(array|atomic|bool|[fiu]32|mat[2-4]x[2-4]|ptr|sampler(_comparison)?|vec[2-4])"]
 	#[pattern = r"(texture_multisampled_2d)"]

@@ -2,13 +2,14 @@ use std::{collections::HashMap, sync::Arc};
 
 use crossbeam::channel::{self, Receiver, Sender};
 use dashmap::{DashMap, DashSet};
-use gramatika::{ArcStr, ParseStream, Substr, Token as _};
+use gramatika::{once_cell::sync::OnceCell, ArcStr, ParseStream, Substr, Token as _};
 use itertools::Itertools;
 use lsp_server::{Message, Notification};
 use lsp_types::{
 	notification::Notification as _, DidChangeTextDocumentParams as UpdateParams,
 	DidOpenTextDocumentParams as OpenParams, Url,
 };
+use parking_lot::RwLock;
 use parser_v2::{
 	decl::ModuleDecl,
 	traversal::{Visitor, Walk},
@@ -20,11 +21,16 @@ use wgsl_plus::ResolveImportPath;
 mod document;
 mod finder;
 
-use crate::lsp_extensions::{UnreadDependency, UnreadDependencyParams};
+use crate::{
+	configuration::Configuration,
+	lsp_extensions::{UnreadDependency, UnreadDependencyParams},
+};
 
 pub use document::Document;
 use finder::DeclFinder;
 pub use finder::FindDeclResult;
+
+static INSTANCE: OnceCell<Documents> = OnceCell::new();
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Status {
@@ -38,22 +44,36 @@ pub struct Documents {
 	pending: Arc<DashSet<Url>>,
 	ipc: Sender<Message>,
 	status_tx: Sender<Status>,
+	config: Arc<RwLock<Option<Configuration>>>,
 }
 
 impl Documents {
-	pub fn new(ipc: Sender<Message>) -> (Self, Receiver<Status>) {
-		let (status_tx, status_rx) = channel::unbounded();
-		let this = Documents {
-			documents: Arc::new(DashMap::new()),
-			pending: Arc::new(DashSet::new()),
-			ipc,
-			status_tx,
-		};
-
-		(this, status_rx)
+	pub fn global() -> Self {
+		INSTANCE.get().unwrap().clone()
 	}
 
-	pub fn open(&self, params: OpenParams) -> parser_v2::Result<()> {
+	pub fn new(ipc: Sender<Message>) -> (Self, Receiver<Status>) {
+		let (status_tx, status_rx) = channel::unbounded();
+		INSTANCE
+			.set(Documents {
+				documents: Arc::new(DashMap::new()),
+				pending: Arc::new(DashSet::new()),
+				ipc,
+				status_tx,
+				config: Arc::new(RwLock::new(None)),
+			})
+			.unwrap();
+
+		(Self::global(), status_rx)
+	}
+
+	pub fn configure(&self, config: Configuration) {
+		// TODO
+		eprintln!("Received configuration: {:#?}", config);
+		*self.config.write() = Some(config);
+	}
+
+	pub fn open(&self, params: OpenParams) -> anyhow::Result<()> {
 		self.status_tx.send(Status::Pending).unwrap();
 
 		let uri = params.text_document.uri;
@@ -194,6 +214,7 @@ impl Clone for Documents {
 			pending: Arc::clone(&self.pending),
 			ipc: self.ipc.clone(),
 			status_tx: self.status_tx.clone(),
+			config: Arc::clone(&self.config),
 		}
 	}
 }

@@ -39,7 +39,7 @@
 		"@nxrs/cargo": "^0.3.1",
 		"@types/jest": "26.0.8",
 		"@types/node": "14.14.33",
-		"@types/vscode": "1.61.0",
+		"@types/vscode": "^1.61.0",
 		"@typescript-eslint/eslint-plugin": "4.19.0",
 		"@typescript-eslint/parser": "4.31.1",
 		"@vscode-devkit/grammar": "0.0.1",

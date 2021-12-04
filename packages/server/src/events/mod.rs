@@ -7,18 +7,21 @@ use std::{
 };
 
 use crossbeam::channel::{Receiver, Sender};
-use lsp_server::{Message, Notification, Request as LSPRequest, RequestId};
+use lsp_server::{
+	Message, Notification as LSPNotification, Request as LSPRequest, RequestId, Response,
+};
 use lsp_types::{
 	notification::{
-		DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, Notification as _,
+		DidChangeConfiguration, DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument,
+		Notification as _,
 	},
 	request::{
 		CodeLensRequest, DocumentSymbolRequest, GotoDefinition, HoverRequest, References,
 		Request as _, SemanticTokensFullRequest,
 	},
-	CodeLensParams, DidChangeTextDocumentParams, DidCloseTextDocumentParams,
-	DidOpenTextDocumentParams, DocumentSymbolParams, GotoDefinitionParams, HoverParams,
-	ReferenceParams, SemanticTokensParams, Url,
+	CodeLensParams, DidChangeConfigurationParams, DidChangeTextDocumentParams,
+	DidCloseTextDocumentParams, DidOpenTextDocumentParams, DocumentSymbolParams,
+	GotoDefinitionParams, HoverParams, ReferenceParams, SemanticTokensParams, Url,
 };
 use parking_lot::Mutex;
 
@@ -26,6 +29,7 @@ use crate::{
 	documents::{Documents, Status},
 	lsp_extensions::{DebugAst, DebugDocumentParams, DebugTokens},
 };
+pub use requester::*;
 
 mod code_lens;
 mod debug_ast;
@@ -34,6 +38,7 @@ mod definition;
 mod document_symbols;
 mod hover;
 mod references;
+mod requester;
 pub mod semantic_tokens;
 
 enum Request {
@@ -47,26 +52,18 @@ enum Request {
 	CodeLens(RequestId, CodeLensParams),
 }
 
-enum DocEvent {
-	Open(DidOpenTextDocumentParams),
-	Change(DidChangeTextDocumentParams),
-	Close(DidCloseTextDocumentParams),
+enum Notification {
+	DocumentOpen(DidOpenTextDocumentParams),
+	DocumentChange(DidChangeTextDocumentParams),
+	DocumentClose(DidCloseTextDocumentParams),
+	ConfigChange(DidChangeConfigurationParams),
 }
 
+#[derive(Clone)]
 pub struct Dispatcher {
 	queue: Arc<Mutex<VecDeque<Request>>>,
-	documents: Arc<Documents>,
+	documents: Documents,
 	ipc: Sender<Message>,
-}
-
-impl Clone for Dispatcher {
-	fn clone(&self) -> Self {
-		Self {
-			queue: Arc::clone(&self.queue),
-			documents: Arc::clone(&self.documents),
-			ipc: self.ipc.clone(),
-		}
-	}
 }
 
 macro_rules! next {
@@ -85,7 +82,7 @@ impl Dispatcher {
 		let (documents, docs_status) = Documents::new(tx.clone());
 		let this = Self {
 			queue: Arc::new(Mutex::new(VecDeque::new())),
-			documents: Arc::new(documents),
+			documents,
 			ipc: tx,
 		};
 
@@ -93,23 +90,30 @@ impl Dispatcher {
 		this
 	}
 
-	pub fn notify(&self, notif: Notification) {
-		if let Ok(event) = notif.try_into() {
-			match event {
-				DocEvent::Open(params) => {
-					let _ = self.documents.open(params);
+	pub fn notify(&self, notif: LSPNotification) {
+		use Notification::*;
+
+		match notif.try_into() {
+			Ok(event) => match event {
+				DocumentOpen(params) => {
+					self.documents.open(params).unwrap();
 				}
-				DocEvent::Change(params) => {
-					let _ = self.documents.update(params);
+				DocumentChange(params) => {
+					self.documents.update(params).unwrap();
 				}
-				DocEvent::Close(_) => {} // TODO
-			}
+				DocumentClose(_) => {} // TODO
+				ConfigChange(params) => {
+					self.documents.configure(params.settings.into());
+				}
+			},
+			Err(err) => eprintln!("{}", err),
 		}
 	}
 
 	pub fn dispatch(&self, req: LSPRequest) {
-		if let Ok(req) = req.try_into() {
-			self.queue.lock().push_back(req);
+		match req.try_into() {
+			Ok(req) => self.queue.lock().push_back(req),
+			Err(err) => eprintln!("{}", err),
 		}
 
 		match self.documents.status() {
@@ -159,18 +163,22 @@ macro_rules! from_request {
 	}
 }
 
-macro_rules! from_doc_event {
+macro_rules! from_notification {
 	($notification:ident, { $($msg_type:ident => $variant:ident),*$(,)? }) => {
 		match &$notification.method[..] {
 			$($msg_type::METHOD => {
 				let params = $notification.extract($msg_type::METHOD)?;
-				eprintln!(
-					"[Notification] {} : {}",
-					$msg_type::METHOD,
-					GetUri::uri(&params),
-				);
+				if let Some(uri) = GetUri::uri(&params) {
+					eprintln!(
+						"[Notification] {} : {}",
+						$msg_type::METHOD,
+						uri,
+					);
+				} else {
+					eprintln!("[Notification] {}", $msg_type::METHOD);
+				}
 
-				Ok(DocEvent::$variant(params))
+				Ok(Notification::$variant(params))
 			})*
 			_ => Err($notification.into())
 		}
@@ -194,14 +202,15 @@ impl TryFrom<LSPRequest> for Request {
 	}
 }
 
-impl TryFrom<Notification> for DocEvent {
+impl TryFrom<LSPNotification> for Notification {
 	type Error = DispatchError;
 
-	fn try_from(value: Notification) -> Result<Self, Self::Error> {
-		from_doc_event!(value, {
-			DidOpenTextDocument => Open,
-			DidChangeTextDocument => Change,
-			DidCloseTextDocument => Close,
+	fn try_from(value: LSPNotification) -> Result<Self, Self::Error> {
+		from_notification!(value, {
+			DidOpenTextDocument => DocumentOpen,
+			DidChangeTextDocument => DocumentChange,
+			DidCloseTextDocument => DocumentClose,
+			DidChangeConfiguration => ConfigChange,
 		})
 	}
 }
@@ -214,23 +223,23 @@ pub struct DispatchError {
 impl From<LSPRequest> for DispatchError {
 	fn from(req: LSPRequest) -> Self {
 		Self {
-			message: std::format!("No event handler for request:\n{:?}", req),
+			message: std::format!("No event handler for request: {}", req.method),
 		}
 	}
 }
 
-impl From<Notification> for DispatchError {
-	fn from(notif: Notification) -> Self {
+impl From<LSPNotification> for DispatchError {
+	fn from(notif: LSPNotification) -> Self {
 		Self {
-			message: std::format!("No event handler for notification:\n{:?}", notif),
+			message: std::format!("No event handler for notification: {}", notif.method),
 		}
 	}
 }
 
-impl From<Message> for DispatchError {
-	fn from(msg: Message) -> Self {
+impl From<Response> for DispatchError {
+	fn from(res: Response) -> Self {
 		Self {
-			message: std::format!("No event handler for message:\n{:?}", msg),
+			message: std::format!("No event handler for response: {}", res.id),
 		}
 	}
 }
@@ -242,24 +251,30 @@ impl fmt::Display for DispatchError {
 }
 
 trait GetUri<'a> {
-	fn uri(&'a self) -> &'a Url;
+	fn uri(&'a self) -> Option<&'a Url>;
 }
 
 impl<'a> GetUri<'a> for DidOpenTextDocumentParams {
-	fn uri(&'a self) -> &'a Url {
-		&self.text_document.uri
+	fn uri(&'a self) -> Option<&'a Url> {
+		Some(&self.text_document.uri)
 	}
 }
 
 impl<'a> GetUri<'a> for DidChangeTextDocumentParams {
-	fn uri(&'a self) -> &'a Url {
-		&self.text_document.uri
+	fn uri(&'a self) -> Option<&'a Url> {
+		Some(&self.text_document.uri)
 	}
 }
 
 impl<'a> GetUri<'a> for DidCloseTextDocumentParams {
-	fn uri(&'a self) -> &'a Url {
-		&self.text_document.uri
+	fn uri(&'a self) -> Option<&'a Url> {
+		Some(&self.text_document.uri)
+	}
+}
+
+impl<'a> GetUri<'a> for DidChangeConfigurationParams {
+	fn uri(&'a self) -> Option<&'a Url> {
+		None
 	}
 }
 

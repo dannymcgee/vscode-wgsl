@@ -35,5 +35,9 @@ export const keyword: TMGrammarScope = {
 			match: /\b(sampler|array)\b/,
 			name: "entity.name.type.wgsl",
 		},
+		{
+			match: /\b(true|false)\b/,
+			name: "constant.language.boolean.wgsl",
+		},
 	],
 };

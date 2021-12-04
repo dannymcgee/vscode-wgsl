@@ -1,4 +1,4 @@
-import { ExtensionContext } from "vscode";
+import { ExtensionContext, OutputChannel, window } from "vscode";
 import { LanguageClient } from "vscode-languageclient/node";
 
 // prettier-ignore
@@ -8,9 +8,12 @@ class Context implements ExtensionContext {
 	inner: ExtensionContext;
 	client: LanguageClient;
 
+	private _channel: OutputChannel;
+
 	constructor(ctx: ExtensionContext, client: LanguageClient) {
 		this.inner = ctx;
 		this.client = client;
+		this._channel = window.createOutputChannel("WGSL Language Client");
 
 		Context.instance = this;
 	}
@@ -35,6 +38,10 @@ class Context implements ExtensionContext {
 	get extension() { return this.inner.extension }
 
 	get asAbsolutePath() { return this.inner.asAbsolutePath }
+
+	log(message: string): void {
+		this._channel.appendLine(message);
+	}
 }
 
 namespace ctx {

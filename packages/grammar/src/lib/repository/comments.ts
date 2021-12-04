@@ -10,5 +10,10 @@ export const comment: TMGrammarScope = {
 			end: /(?=$)/,
 			name: "comment.line.wgsl",
 		},
+		{
+			begin: /#/,
+			end: /(?=$)/,
+			name: "preprocessor.directive.wgsl",
+		}
 	],
 };

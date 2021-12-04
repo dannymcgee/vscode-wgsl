@@ -63,7 +63,41 @@
 				"enablement": "false",
 				"category": "WGSL"
 			}
-		]
+		],
+		"configuration": {
+			"title": "WGSL",
+			"type": "object",
+			"properties": {
+				"wgsl.preprocessor.includeKeyword": {
+					"title": "Include keyword",
+					"type": "string",
+					"default": ""
+				},
+				"wgsl.preprocessor.includePaths": {
+					"title": "Include paths",
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"wgsl.preprocessor.includeModuleAliases": {
+					"title": "Module aliases",
+					"type": "array",
+					"items": {
+						"type": "object",
+						"properties": {
+							"name": {
+								"type": "string"
+							},
+							"path": {
+								"type": "string"
+							}
+						},
+						"required": ["name", "path"]
+					}
+				}
+			}
+		}
 	},
 	"configurationDefaults": {
 		"[wgsl]": {
