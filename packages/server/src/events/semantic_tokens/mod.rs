@@ -19,7 +19,7 @@ pub use legend::{legend, TokenMod, TokenType};
 
 pub fn handle(id: RequestId, params: SemanticTokensParams, docs: &Documents) -> Message {
 	let tokens = get_semantic_tokens(params.text_document.uri, docs);
-	let result = Some(json::to_value(&tokens).unwrap());
+	let result = Some(json::to_value(tokens).unwrap());
 
 	Message::Response(Response {
 		id,

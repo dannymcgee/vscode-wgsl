@@ -48,7 +48,7 @@ pub fn handle(id: RequestId, params: GotoDefinitionParams, docs: &Documents) -> 
 
 	Message::Response(Response {
 		id,
-		result: Some(json::to_value(&result).unwrap()),
+		result: Some(json::to_value(result).unwrap()),
 		error: None,
 	})
 }

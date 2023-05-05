@@ -43,7 +43,7 @@ impl Configuration {
 			let request = Request {
 				id: "workspace/configuration".to_string().into(),
 				method: WorkspaceConfiguration::METHOD.into(),
-				params: json::to_value(&params).unwrap(),
+				params: json::to_value(params).unwrap(),
 			};
 
 			Requester::global().send(request, |response| {

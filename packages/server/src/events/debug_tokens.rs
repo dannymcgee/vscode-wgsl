@@ -30,7 +30,7 @@ pub fn handle(id: RequestId, params: DebugDocumentParams, docs: &Documents) -> M
 
 	Message::Response(Response {
 		id,
-		result: Some(json::to_value(&result).unwrap()),
+		result: Some(json::to_value(result).unwrap()),
 		error: None,
 	})
 }

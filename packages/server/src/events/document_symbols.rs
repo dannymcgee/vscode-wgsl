@@ -82,7 +82,7 @@ impl AsSymbol for Decl {
 
 		let ident = self.name();
 		let builder = DocSymBuilder::new()
-			.name(&ident)
+			.name(ident)
 			.range(self.span().to_range())
 			.selection_range(ident.span().to_range());
 

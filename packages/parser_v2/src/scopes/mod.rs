@@ -119,17 +119,14 @@ impl Scope {
 		if !self.span.contains(span) {
 			None
 		} else if self.bindings.read().contains_key(&(lexeme.clone(), kind)) {
-			self.bindings
-				.read()
-				.get(&(lexeme, kind))
-				.map(|decl| Arc::clone(decl))
+			self.bindings.read().get(&(lexeme, kind)).map(Arc::clone)
 		} else {
 			self.children
 				.read()
 				.iter()
 				.find_map(|env| env.find_decl(token))
 				.as_ref()
-				.map(|decl| Arc::clone(decl))
+				.map(Arc::clone)
 		}
 	}
 
@@ -143,17 +140,14 @@ impl Scope {
 		} else if self.bindings.read().contains_key(field_key)
 			&& self.bindings.read().contains_key(struct_key)
 		{
-			self.bindings
-				.read()
-				.get(field_key)
-				.map(|decl| Arc::clone(decl))
+			self.bindings.read().get(field_key).map(Arc::clone)
 		} else {
 			self.children
 				.read()
 				.iter()
 				.find_map(|env| env.find_field_decl(token, struct_name))
 				.as_ref()
-				.map(|decl| Arc::clone(decl))
+				.map(Arc::clone)
 		}
 	}
 

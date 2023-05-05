@@ -13,11 +13,11 @@ use super::references;
 use crate::documents::Documents;
 
 pub fn handle(id: RequestId, params: CodeLensParams, docs: &Documents) -> Message {
-	let result = get_lenses(&params, docs).unwrap_or_else(Vec::new);
+	let result = get_lenses(&params, docs).unwrap_or_default();
 
 	Message::Response(Response {
 		id,
-		result: Some(json::to_value(&result).unwrap()),
+		result: Some(json::to_value(result).unwrap()),
 		error: None,
 	})
 }
@@ -66,7 +66,7 @@ fn get_lenses(params: &CodeLensParams, docs: &Documents) -> Option<Vec<CodeLens>
 				command: Some(Command {
 					title,
 					command: "wgsl.resolveLensReferences".into(),
-					arguments: Some(vec![json::to_value(&cmd_params).unwrap()]),
+					arguments: Some(vec![json::to_value(cmd_params).unwrap()]),
 				}),
 				data: Some(json::to_value(&refs).unwrap()),
 				range,

@@ -3,8 +3,7 @@ use std::hash::Hash;
 
 use gramatika::{Span, Spanned, Substr, Token as _};
 
-#[allow(clippy::derive_hash_xor_eq)]
-#[derive(DebugLispToken, Hash, Token, Lexer)]
+#[derive(DebugLispToken, Token, Lexer)]
 pub enum Token {
 	#[pattern = r"\[\[?|\]\]?|[(){}]"]
 	Brace(Substr, Span),
@@ -82,6 +81,15 @@ impl fmt::Debug for Token {
 impl fmt::Display for Token {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "{}", self.lexeme())
+	}
+}
+
+impl Hash for Token {
+	fn hash<H>(&self, state: &mut H)
+	where H: std::hash::Hasher {
+		self.kind().hash(state);
+		self.lexeme().hash(state);
+		self.span().hash(state);
 	}
 }
 

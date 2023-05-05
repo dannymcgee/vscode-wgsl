@@ -73,7 +73,7 @@ impl DiagnosticBuilder {
 			message: self.message.expect("message field is uninitialized!"),
 			related_information: self.related_information,
 			tags: self.tags,
-			data: Some(json::to_value(&self.kind).unwrap()),
+			data: Some(json::to_value(self.kind).unwrap()),
 		}
 	}
 }

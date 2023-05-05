@@ -14,11 +14,11 @@ pub fn handle(id: RequestId, params: ReferenceParams, docs: &Documents) -> Messa
 	let pos = params.text_document_position.position;
 	let include_decl = params.context.include_declaration;
 
-	let result = find_all(uri, pos, include_decl, docs).unwrap_or_else(Vec::new);
+	let result = find_all(uri, pos, include_decl, docs).unwrap_or_default();
 
 	Message::Response(Response {
 		id,
-		result: Some(json::to_value(&result).unwrap()),
+		result: Some(json::to_value(result).unwrap()),
 		error: None,
 	})
 }

@@ -70,14 +70,14 @@ pub fn handle(id: RequestId, params: HoverParams, docs: &Documents) -> Message {
 
 			Message::Response(Response {
 				id,
-				result: Some(json::to_value(&result).unwrap()),
+				result: Some(json::to_value(result).unwrap()),
 				error: None,
 			})
 		}
 		None => Message::Response(Response {
 			id,
 			result: Some(
-				json::to_value(&Hover {
+				json::to_value(Hover {
 					contents: HoverContents::Array(vec![]),
 					range: None,
 				})
