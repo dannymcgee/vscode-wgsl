@@ -1,6 +1,6 @@
 use gramatika::{Lexer as _, Span, Token as _};
 
-use crate::{token, Token, TokenKind};
+use crate::{tests, token, Token, TokenKind};
 
 macro_rules! match_tokens {
 	($ttype:ident, [$($input:literal),+$(,)?]) => {{
@@ -229,8 +229,9 @@ fn kitchen_sink() {
 	use Token::*;
 
 	let input = "var<uniform> uniforms: Uniforms;";
+	let result = lex(input);
 	#[rustfmt::skip]
-	assert_eq!(lex(input), vec![
+	let expected = vec![
 		Keyword( literal_substr!("var"),      span![0:0...0:3]),
 		Operator(literal_substr!("<"),        span![0:3...0:4]),
 		Keyword( literal_substr!("uniform"),  span![0:4...0:11]),
@@ -239,12 +240,19 @@ fn kitchen_sink() {
 		Punct(   literal_substr!(":"),        span![0:21...0:22]),
 		Ident(   literal_substr!("Uniforms"), span![0:23...0:31]),
 		Punct(   literal_substr!(";"),        span![0:31...0:32]),
-	]);
+	];
+	assert_eq!(
+		result,
+		expected,
+		"\n{}",
+		tests::diff(&format!("{:#?}", &result), &format!("{:#?}", &expected))
+	);
 
 	let input = "@group(0) @binding(0) var t_diffuse: texture_2d<f32>;";
+	let result = lex(input);
 	#[rustfmt::skip]
-	assert_eq!(lex(input), vec![
-		Punct(     literal_substr!("@"),         span![0:0...0:1]),
+	let expected = vec![
+		Punct(     literal_substr!("@"),          span![0:0...0:1]),
 		Ident(     literal_substr!("group"),      span![0:1...0:6]),
 		Brace(     literal_substr!("("),          span![0:6...0:7]),
 		IntLiteral(literal_substr!("0"),          span![0:7...0:8]),
@@ -262,15 +270,22 @@ fn kitchen_sink() {
 		Type(      literal_substr!("f32"),        span![0:48...0:51]),
 		Operator(  literal_substr!(">"),          span![0:51...0:52]),
 		Punct(     literal_substr!(";"),          span![0:52...0:53]),
-	]);
+	];
+	assert_eq!(
+		result,
+		expected,
+		"\n{}",
+		tests::diff(&format!("{:#?}", &result), &format!("{:#?}", &expected))
+	);
 
 	let input = r#"
 // Here's a comment describing the next line
 @group(0) @binding(0)
 var t_diffuse: texture_2d<f32>;
 	"#;
+	let result = lex(input);
 	#[rustfmt::skip]
-	assert_eq!(lex(input), vec![
+	let expected = vec![
 		// Line 1
 		Comment(literal_substr!("// Here's a comment describing the next line"), span![1:0...1:44]),
 		// Line 2
@@ -293,7 +308,13 @@ var t_diffuse: texture_2d<f32>;
 		Type(    literal_substr!("f32"),        span![3:26...3:29]),
 		Operator(literal_substr!(">"),          span![3:29...3:30]),
 		Punct(   literal_substr!(";"),          span![3:30...3:31]),
-	]);
+	];
+	assert_eq!(
+		result,
+		expected,
+		"\n{}",
+		tests::diff(&format!("{:#?}", &result), &format!("{:#?}", &expected))
+	);
 }
 
 fn lex(input: &str) -> Vec<Token> {
