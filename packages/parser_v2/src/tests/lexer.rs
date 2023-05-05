@@ -27,7 +27,6 @@ fn two_char_tokens() {
 	match_tokens!(Operator, [
 		"&&", "||", "--", "++", "==", ">>", "<<", "!=", "<=", ">=", "->",
 	]);
-	match_tokens!(Brace, ["[[", "]]"]);
 	match_tokens!(Punct, ["::"]);
 }
 
@@ -242,33 +241,32 @@ fn kitchen_sink() {
 		Punct(   literal_substr!(";"),        span![0:31...0:32]),
 	]);
 
-	let input = "[[group(0), binding(0)]] var t_diffuse: texture_2d<f32>;";
+	let input = "@group(0) @binding(0) var t_diffuse: texture_2d<f32>;";
 	#[rustfmt::skip]
 	assert_eq!(lex(input), vec![
-		Brace(     literal_substr!("[["),         span![0:0...0:2]),
-		Ident(     literal_substr!("group"),      span![0:2...0:7]),
-		Brace(     literal_substr!("("),          span![0:7...0:8]),
-		IntLiteral(literal_substr!("0"),          span![0:8...0:9]),
-		Brace(     literal_substr!(")"),          span![0:9...0:10]),
-		Punct(     literal_substr!(","),          span![0:10...0:11]),
-		Ident(     literal_substr!("binding"),    span![0:12...0:19]),
-		Brace(     literal_substr!("("),          span![0:19...0:20]),
-		IntLiteral(literal_substr!("0"),          span![0:20...0:21]),
-		Brace(     literal_substr!(")"),          span![0:21...0:22]),
-		Brace(     literal_substr!("]]"),         span![0:22...0:24]),
-		Keyword(   literal_substr!("var"),        span![0:25...0:28]),
-		Ident(     literal_substr!("t_diffuse"),  span![0:29...0:38]),
-		Punct(     literal_substr!(":"),          span![0:38...0:39]),
-		Type(      literal_substr!("texture_2d"), span![0:40...0:50]),
-		Operator(  literal_substr!("<"),          span![0:50...0:51]),
-		Type(      literal_substr!("f32"),        span![0:51...0:54]),
-		Operator(  literal_substr!(">"),          span![0:54...0:55]),
-		Punct(     literal_substr!(";"),          span![0:55...0:56]),
+		Punct(     literal_substr!("@"),         span![0:0...0:1]),
+		Ident(     literal_substr!("group"),      span![0:1...0:6]),
+		Brace(     literal_substr!("("),          span![0:6...0:7]),
+		IntLiteral(literal_substr!("0"),          span![0:7...0:8]),
+		Brace(     literal_substr!(")"),          span![0:8...0:9]),
+		Punct(     literal_substr!("@"),          span![0:10...0:11]),
+		Ident(     literal_substr!("binding"),    span![0:11...0:18]),
+		Brace(     literal_substr!("("),          span![0:18...0:19]),
+		IntLiteral(literal_substr!("0"),          span![0:19...0:20]),
+		Brace(     literal_substr!(")"),          span![0:20...0:21]),
+		Keyword(   literal_substr!("var"),        span![0:22...0:25]),
+		Ident(     literal_substr!("t_diffuse"),  span![0:26...0:35]),
+		Punct(     literal_substr!(":"),          span![0:35...0:36]),
+		Type(      literal_substr!("texture_2d"), span![0:37...0:47]),
+		Operator(  literal_substr!("<"),          span![0:47...0:48]),
+		Type(      literal_substr!("f32"),        span![0:48...0:51]),
+		Operator(  literal_substr!(">"),          span![0:51...0:52]),
+		Punct(     literal_substr!(";"),          span![0:52...0:53]),
 	]);
 
 	let input = r#"
 // Here's a comment describing the next line
-[[group(0), binding(0)]]
+@group(0) @binding(0)
 var t_diffuse: texture_2d<f32>;
 	"#;
 	#[rustfmt::skip]
@@ -276,17 +274,16 @@ var t_diffuse: texture_2d<f32>;
 		// Line 1
 		Comment(literal_substr!("// Here's a comment describing the next line"), span![1:0...1:44]),
 		// Line 2
-		Brace(     literal_substr!("[["),      span![2:0...2:2]),
-		Ident(     literal_substr!("group"),   span![2:2...2:7]),
-		Brace(     literal_substr!("("),       span![2:7...2:8]),
-		IntLiteral(literal_substr!("0"),       span![2:8...2:9]),
-		Brace(     literal_substr!(")"),       span![2:9...2:10]),
-		Punct(     literal_substr!(","),       span![2:10...2:11]),
-		Ident(     literal_substr!("binding"), span![2:12...2:19]),
-		Brace(     literal_substr!("("),       span![2:19...2:20]),
-		IntLiteral(literal_substr!("0"),       span![2:20...2:21]),
-		Brace(     literal_substr!(")"),       span![2:21...2:22]),
-		Brace(     literal_substr!("]]"),      span![2:22...2:24]),
+		Punct(     literal_substr!("@"),       span![2:0...2:1]),
+		Ident(     literal_substr!("group"),   span![2:1...2:6]),
+		Brace(     literal_substr!("("),       span![2:6...2:7]),
+		IntLiteral(literal_substr!("0"),       span![2:7...2:8]),
+		Brace(     literal_substr!(")"),       span![2:8...2:9]),
+		Punct(     literal_substr!("@"),       span![2:10...2:11]),
+		Ident(     literal_substr!("binding"), span![2:11...2:18]),
+		Brace(     literal_substr!("("),       span![2:18...2:19]),
+		IntLiteral(literal_substr!("0"),       span![2:19...2:20]),
+		Brace(     literal_substr!(")"),       span![2:20...2:21]),
 		// Line 3
 		Keyword( literal_substr!("var"),        span![3:0...3:3]),
 		Ident(   literal_substr!("t_diffuse"),  span![3:4...3:13]),

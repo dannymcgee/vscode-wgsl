@@ -10,8 +10,8 @@ struct DolorSitAmet {
 	baz: f32;
 };
 
-[[stage(fragment)]]
-fn main(lorem: LoremIpsum, dolor: DolorSitAmet) -> [[location(0)]] vec4<f32> {
+@fragment
+fn main(lorem: LoremIpsum, dolor: DolorSitAmet) -> @location(0) vec4<f32> {
 	let lorem_foo = lorem.foo;
 	let dolor_foo = dolor.foo;
 

@@ -3,21 +3,21 @@ use std::sync::Arc;
 use gramatika::{Parse, ParseStreamer, Span, Spanned, SpannedError, Token as _};
 
 use crate::{
-	expr::{Expr, IdentExpr},
+	expr::{Expr, GroupExpr, IdentExpr},
 	ParseStream, Token, TokenKind, *,
 };
 
 #[derive(Clone, DebugLisp)]
 pub struct AttributeList {
-	pub open_brace: Token,
 	pub attributes: Arc<[Attribute]>,
-	pub close_brace: Token,
 }
 
 #[derive(Clone, DebugLisp)]
 pub struct Attribute {
+	pub at_sign: Token,
 	pub name: Token,
-	pub value: Option<Token>,
+	/// Will be `None` or `Expr::Group(...)`
+	pub params: Option<Expr>,
 }
 
 #[derive(Clone, DebugLisp)]
@@ -40,7 +40,16 @@ pub struct ArgumentList {
 
 impl Spanned for AttributeList {
 	fn span(&self) -> Span {
-		self.open_brace.span().through(self.close_brace.span())
+		match self.attributes.len() {
+			0 => Span::default(),
+			1 => self.attributes.first().unwrap().span(),
+			_ => self
+				.attributes
+				.first()
+				.unwrap()
+				.span()
+				.through(self.attributes.last().unwrap().span()),
+		}
 	}
 }
 
@@ -48,50 +57,23 @@ impl Parse for AttributeList {
 	type Stream = ParseStream;
 
 	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
-		use TokenKind::*;
-
-		let open_brace = input.consume(brace!["[["])?;
-
 		let mut attributes = vec![];
-		while !input.check(brace!["]]"]) {
-			match input.peek() {
-				Some(token) => match token.as_matchable() {
-					(Ident, _, _) => attributes.push(input.parse()?),
-					(Punct, ",", _) => input.discard(),
-					(_, _, span) => {
-						return Err(SpannedError {
-							message: "Expected attribute, `,`, or `]]`".into(),
-							span: Some(span),
-							source: input.source(),
-						})
-					}
-				},
-				None => {
-					return Err(SpannedError {
-						message: "Unexpected end of input".into(),
-						source: input.source(),
-						span: None,
-					})
-				}
-			};
+		while input.check(punct!["@"]) {
+			attributes.push(input.parse()?);
 		}
 
-		let close_brace = input.consume(brace!["]]"])?;
-
 		Ok(Self {
-			open_brace,
 			attributes: attributes.into(),
-			close_brace,
 		})
 	}
 }
 
 impl Spanned for Attribute {
 	fn span(&self) -> Span {
-		if let Some(ref value) = self.value {
-			self.name.span().through(value.span())
+		if let Some(ref params) = self.params {
+			self.at_sign.span().through(params.span())
 		} else {
-			self.name.span()
+			self.at_sign.span().through(self.name.span())
 		}
 	}
 }
@@ -100,36 +82,19 @@ impl Parse for Attribute {
 	type Stream = ParseStream;
 
 	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
-		use TokenKind::*;
-
+		let at_sign = input.consume(punct!["@"])?;
 		let name = input.consume_as(TokenKind::Ident, Token::attribute)?;
-		let value = if input.check(brace!["("]) {
-			input.consume(brace!["("])?;
-
-			let value = match input.next() {
-				Some(token) => match token.kind() {
-					Ident | Keyword | IntLiteral | UintLiteral | FloatLiteral => Ok(token),
-					_ => Err(SpannedError {
-						message: "Expected literal or identifier".into(),
-						source: input.source(),
-						span: Some(token.span()),
-					}),
-				},
-				None => Err(SpannedError {
-					message: "Unexpected end of input".into(),
-					source: input.source(),
-					span: input.prev().map(|token| token.span()),
-				}),
-			}?;
-
-			input.consume(brace![")"])?;
-
-			Some(value)
+		let params = if input.check(brace!["("]) {
+			Some(Expr::Group(input.parse::<GroupExpr>()?))
 		} else {
 			None
 		};
 
-		Ok(Self { name, value })
+		Ok(Self {
+			at_sign,
+			name,
+			params,
+		})
 	}
 }
 
@@ -220,7 +185,7 @@ impl Parse for TypeDecl {
 		if input.check(punct![:]) || input.check(operator![->]) {
 			builder.annotator(input.next().unwrap());
 		}
-		if input.check(brace!["[["]) {
+		if input.check(punct!["@"]) {
 			builder.attributes(input.parse()?);
 		}
 		if input.check_kind(TokenKind::Type) {

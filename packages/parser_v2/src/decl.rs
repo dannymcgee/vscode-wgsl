@@ -146,19 +146,8 @@ impl Parse for Decl {
 
 		match input.peek() {
 			Some(token) => match token.as_matchable() {
-				(Brace, "[[", _) => {
-					let attributes = match input.parse::<AttributeList>() {
-						Ok(attr) => Some(attr),
-						Err(err) => {
-							while !input.check(brace!["]]"]) {
-								input.discard();
-							}
-							if !input.is_empty() {
-								input.consume(brace!["]]"]).unwrap();
-							}
-							return Ok(Decl::Error(err));
-						}
-					};
+				(Punct, "@", _) => {
+					let attributes = Some(input.parse::<AttributeList>()?);
 
 					match input.parse::<Decl>()? {
 						Decl::Var(mut inner) => {
@@ -359,7 +348,7 @@ impl Parse for StructBody {
 		while !input.check(brace!["}"]) {
 			match input.peek() {
 				Some(token) => match token.as_matchable() {
-					(Brace, "[[", _) | (Ident, _, _) => {
+					(Punct, "@", _) | (Ident, _, _) => {
 						let field = input.parse::<FieldDecl>()?;
 						fields.push(Decl::Field(field));
 					}
@@ -401,7 +390,7 @@ impl Parse for FieldDecl {
 	type Stream = ParseStream;
 
 	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
-		let attributes = if input.check(brace!["[["]) {
+		let attributes = if input.check(punct!["@"]) {
 			Some(input.parse::<AttributeList>()?)
 		} else {
 			None
@@ -424,7 +413,7 @@ impl Spanned for FieldDecl {
 		let span_start = self
 			.attributes
 			.as_ref()
-			.map(|attr| &attr.open_brace)
+			.and_then(|attrs| attrs.attributes.first().map(|attr| &attr.at_sign))
 			.unwrap_or(&self.name)
 			.span();
 
@@ -455,7 +444,7 @@ impl Parse for FunctionDecl {
 		while !input.check(brace![")"]) {
 			match input.peek() {
 				Some(token) => match token.as_matchable() {
-					(Brace, "[[", _) | (Ident, _, _) => {
+					(Punct, "@", _) | (Ident, _, _) => {
 						let param = input.parse::<ParamDecl>()?;
 						params.push(Decl::Param(param));
 					}
@@ -509,7 +498,7 @@ impl Parse for ParamDecl {
 	type Stream = ParseStream;
 
 	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
-		let attributes = if input.check(brace!["[["]) {
+		let attributes = if input.check(punct!["@"]) {
 			Some(input.parse::<AttributeList>()?)
 		} else {
 			None
@@ -530,7 +519,7 @@ impl Spanned for ParamDecl {
 		let span_start = self
 			.attributes
 			.as_ref()
-			.map(|attr| &attr.open_brace)
+			.and_then(|attrs| attrs.attributes.first().map(|attr| &attr.at_sign))
 			.unwrap_or(&self.name)
 			.span();
 

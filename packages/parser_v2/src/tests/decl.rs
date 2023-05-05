@@ -27,10 +27,10 @@ struct Data {
 	super::parse::<StructDecl>(
 		r#"
 struct VertexOutput {
-	[[builtin(position)]] clip_position: vec4<f32>;
-	[[location(0)]] tex_coords: vec2<f32>;
-	[[location(1)]] world_normal: vec3<f32>;
-	[[location(2)]] world_position: vec3<f32>;
+	@builtin(position) clip_position: vec4<f32>;
+	@location(0) tex_coords: vec2<f32>;
+	@location(1) world_normal: vec3<f32>;
+	@location(2) world_position: vec3<f32>;
 };
 	"#,
 	);
@@ -40,7 +40,7 @@ struct VertexOutput {
 fn function_decl() {
 	super::parse::<FunctionDecl>(
 		r#"
-fn main() -> [[location(0)]] vec4<f32> {
+fn main() -> @location(0) vec4<f32> {
 	return vec4<f32>(0.4, 0.4, 0.8, 1.0);
 }
 	"#,
@@ -48,8 +48,8 @@ fn main() -> [[location(0)]] vec4<f32> {
 	super::parse::<FunctionDecl>(
 		r#"
 fn main(
-	[[builtin(position)]] coord_in: vec4<f32>,
-) -> [[location(0)]] vec4<f32> {
+	@builtin(position) coord_in: vec4<f32>,
+) -> @location(0) vec4<f32> {
 	return vec4<f32>(coord_in.x, coord_in.y, 0.0, 1.0);
 }
 	"#,
@@ -67,7 +67,7 @@ fn mul(a: f32, b: f32) -> f32 {
 fn attribute_insertion() {
 	super::parse::<Decl>(
 		r#"
-[[stage(vertex)]]
+@vertex
 fn vert(model: VertexInput) -> VertexOutput {
 	// ...
 }
@@ -75,13 +75,12 @@ fn vert(model: VertexInput) -> VertexOutput {
 	);
 	super::parse::<Decl>(
 		r#"
-[[group(0), binding(0)]]
+@group(0) @binding(0)
 var<uniform> uniforms: common::Uniforms;
 	"#,
 	);
 	super::parse::<Decl>(
 		r#"
-[[block]]
 struct<export> Uniforms {
 	view_pos: vec4<f32>;
 	view_proj: mat4x4<f32>;

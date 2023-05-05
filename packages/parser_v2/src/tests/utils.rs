@@ -7,31 +7,40 @@ const PROGRAM: &str = include_str!("../../test-files/shader.wgsl");
 fn field_decl() {
 	let tree = parse();
 	// `position` on line 16
-	// Expecting to match the field declaration `[[location(0)]] position: vec3<f32>;`
+	// Expecting to match the field declaration `@location(0) position: vec3<f32>;`
 	let target = span![15:17...15:25];
 	if let Some(node) = utils::find_parent(&tree, target) {
 		let found = format!("{:#?}", node);
 		let expected = r#"
 (SyntaxNode::Decl (Decl::Field (FieldDecl
 	attributes: (AttributeList
-		open_brace: `[[` (Brace (16:2...16:4)),
 		attributes: [
 			(Attribute
-				name: `location` (Attribute (16:4...16:12)),
-				value: `0` (IntLiteral (16:13...16:14)),
+				at_sign: `@` (Punct (16:2...16:3)),
+				name: `location` (Attribute (16:3...16:11)),
+				params: (Expr::Group (GroupExpr
+					brace_open: `(` (Brace (16:11...16:12)),
+					expr: (Expr::Primary (PrimaryExpr
+						expr: (Expr::Literal `0` (IntLiteral (16:12...16:13))),
+					)),
+					brace_close: `)` (Brace (16:13...16:14)),
+				)),
 			),
 		],
-	  close_brace: `]]` (Brace (16:15...16:17)),
 	),
-	name: `position` (Field (16:18...16:26)),
+	name: `position` (Field (16:15...16:23)),
 	ty: (TypeDecl
-		annotator: `:` (Punct (16:26...16:27)),
+		annotator: `:` (Punct (16:23...16:24)),
 		name: (IdentExpr
-			name: `vec3` (Type (16:28...16:32)),
+			name: `vec3` (Type (16:25...16:29)),
 		),
-		child_ty: `f32` (Type (16:33...16:36)),
+		child_ty: (TypeDecl
+			name: (IdentExpr
+				name: `f32` (Type (16:30...16:33)),
+			),
+		),
 	),
-	semicolon: `;` (Punct (16:37...16:38)),
+	semicolon: `;` (Punct (16:34...16:35)),
 )))
 		"#;
 		let expected = expected.trim().replace('\t', "  ");

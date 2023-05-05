@@ -27,11 +27,12 @@ impl fmt::Display for TypeDecl {
 
 impl fmt::Display for Attribute {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "{}", self.name)?;
+		write!(f, "@{}", self.name)?;
 
-		if let Some(ref value) = self.value {
-			write!(f, "({})", value)?;
-		}
+		// TODO
+		// if let Some(ref params) = self.params {
+		// 	write!(f, "{}", params)?;
+		// }
 
 		Ok(())
 	}
@@ -39,9 +40,9 @@ impl fmt::Display for Attribute {
 
 impl fmt::Display for AttributeList {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let inner = self.attributes.iter().join(", ");
+		let inner = self.attributes.iter().join(" ");
 
-		write!(f, "[[{}]]", inner)
+		write!(f, "{}", inner)
 	}
 }
 

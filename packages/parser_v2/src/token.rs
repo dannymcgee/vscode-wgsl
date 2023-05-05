@@ -5,7 +5,7 @@ use gramatika::{Span, Spanned, Substr, Token as _};
 
 #[derive(DebugLispToken, Token, Lexer)]
 pub enum Token {
-	#[pattern = r"\[\[?|\]\]?|[(){}]"]
+	#[pattern = r"[\[\](){}]"]
 	Brace(Substr, Span),
 
 	#[discard]
@@ -60,7 +60,7 @@ pub enum Token {
 	#[pattern = "[%*/~^]"]
 	Operator(Substr, Span),
 
-	#[pattern = r"::?|[,.;]"]
+	#[pattern = r"::?|[,.;@]"]
 	Punct(Substr, Span),
 
 	// Tokens without patterns -- need to be upgraded
