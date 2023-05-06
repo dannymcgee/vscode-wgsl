@@ -1,5 +1,4 @@
 use gramatika::SpannedError;
-use itertools::Itertools;
 use lsp_types::{Diagnostic, DiagnosticSeverity, Range};
 use naga::{
 	front::wgsl::ParseError as NagaParseError,
@@ -42,7 +41,11 @@ impl IntoDiagnostics for WithSpan<NagaValidationError> {
 		use FunctionError::*;
 		use NagaValidationError::*;
 
-		let spans = self.spans().cloned().collect_vec();
+		let range = self
+			.location(&doc.source)
+			.map(|source_loc| source_loc.as_range(Some(&doc.source)))
+			.unwrap_or_default();
+
 		let outer_msg = std::format!("{}", &self);
 		let inner_msg = match self.into_inner() {
 			InvalidHandle(inner) => inner.to_string(),
@@ -69,17 +72,12 @@ impl IntoDiagnostics for WithSpan<NagaValidationError> {
 			std::format!("ValidationError: {}", outer_msg)
 		};
 
-		spans
-			.iter()
-			.map(|(span, _)| {
-				DiagnosticBuilder::new(kind)
-					.range(span.as_range(Some(&doc.source)))
-					.severity(DiagnosticSeverity::ERROR)
-					.source("naga::validation")
-					.message(message.clone())
-					.build()
-			})
-			.collect()
+		vec![DiagnosticBuilder::new(kind)
+			.range(range)
+			.severity(DiagnosticSeverity::ERROR)
+			.source("naga::validation")
+			.message(message)
+			.build()]
 	}
 }
 
