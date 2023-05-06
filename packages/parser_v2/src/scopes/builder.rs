@@ -187,22 +187,14 @@ impl Visitor for ScopeBuilder {
 		FlowControl::Break
 	}
 
-	fn visit_elseif_stmt(&mut self, stmt: &IfStmt) -> FlowControl {
-		let starting_scope = self.spawn_for_block(&stmt.then_branch);
-		self.current = Arc::clone(&starting_scope);
-
-		stmt.then_branch.walk(self);
-
-		while self.current.span != starting_scope.span {
-			self.pop_scope();
-		}
-		self.pop_scope();
-
-		FlowControl::Break
-	}
-
 	fn visit_else_stmt(&mut self, stmt: &ElseStmt) -> FlowControl {
-		let starting_scope = self.spawn_for_block(&stmt.body);
+		let starting_scope = match stmt.body.as_ref() {
+			Stmt::Block(stmt) => self.spawn_for_block(stmt),
+			Stmt::If(stmt) => {
+				return self.visit_if_stmt(stmt);
+			}
+			_ => unreachable!(),
+		};
 		self.current = Arc::clone(&starting_scope);
 
 		stmt.body.walk(self);

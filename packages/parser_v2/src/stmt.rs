@@ -45,14 +45,13 @@ pub struct IfStmt {
 	pub keyword: Token,
 	pub condition: Expr,
 	pub then_branch: BlockStmt,
-	pub elseif_branch: Option<Arc<IfStmt>>,
 	pub else_branch: Option<ElseStmt>,
 }
 
 #[derive(Clone, DebugLisp)]
 pub struct ElseStmt {
 	pub keyword: Token,
-	pub body: BlockStmt,
+	pub body: Arc<Stmt>,
 }
 
 #[derive(Clone, DebugLisp)]
@@ -253,12 +252,6 @@ impl Parse for IfStmt {
 		let condition = input.parse::<Expr>()?;
 		let then_branch = input.parse::<BlockStmt>()?;
 
-		let elseif_branch = if input.check(keyword![elseif]) {
-			Some(Arc::new(input.parse::<IfStmt>()?))
-		} else {
-			None
-		};
-
 		let else_branch = if input.check(keyword![else]) {
 			Some(input.parse::<ElseStmt>()?)
 		} else {
@@ -269,7 +262,6 @@ impl Parse for IfStmt {
 			keyword,
 			condition,
 			then_branch,
-			elseif_branch,
 			else_branch,
 		})
 	}
@@ -281,7 +273,6 @@ impl Spanned for IfStmt {
 			.else_branch
 			.as_ref()
 			.map(|stmt| stmt.span())
-			.or_else(|| self.elseif_branch.as_ref().map(|stmt| stmt.span()))
 			.unwrap_or_else(|| self.then_branch.span());
 
 		self.keyword.span().through(end_span)
@@ -293,7 +284,7 @@ impl Parse for ElseStmt {
 
 	fn parse(input: &mut Self::Stream) -> gramatika::Result<Self> {
 		let keyword = input.consume(keyword![else])?;
-		let body = input.parse::<BlockStmt>()?;
+		let body = Arc::new(input.parse::<Stmt>()?);
 
 		Ok(Self { keyword, body })
 	}

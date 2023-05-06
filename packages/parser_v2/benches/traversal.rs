@@ -161,13 +161,6 @@ impl Visitor for NodeCountVisitor {
 		Continue
 	}
 
-	fn visit_elseif_stmt(&mut self, stmt: &IfStmt) -> FlowControl {
-		criterion::black_box(stmt);
-		self.count += 1;
-
-		Continue
-	}
-
 	fn visit_else_stmt(&mut self, stmt: &ElseStmt) -> FlowControl {
 		criterion::black_box(stmt);
 		self.count += 1;

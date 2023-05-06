@@ -44,7 +44,6 @@ pub trait Visitor {
 
 	#[must_use] fn visit_return_stmt(&mut self, stmt: &ReturnStmt) -> FlowControl { FlowControl::Continue }
 	#[must_use] fn visit_if_stmt(&mut self, stmt: &IfStmt) -> FlowControl { FlowControl::Continue }
-	#[must_use] fn visit_elseif_stmt(&mut self, stmt: &IfStmt) -> FlowControl { FlowControl::Continue }
 	#[must_use] fn visit_else_stmt(&mut self, stmt: &ElseStmt) -> FlowControl { FlowControl::Continue }
 	#[must_use] fn visit_switch_stmt(&mut self, stmt: &SwitchStmt) -> FlowControl { FlowControl::Continue }
 	#[must_use] fn visit_case_stmt(&mut self, stmt: &CaseStmt) -> FlowControl { FlowControl::Continue }
@@ -226,19 +225,9 @@ impl Walk for ReturnStmt {
 
 impl Walk for IfStmt {
 	fn walk(&self, visitor: &mut dyn Visitor) {
-		let visit_method = match self.keyword.lexeme().as_str() {
-			"if" => Visitor::visit_if_stmt,
-			"elseif" => Visitor::visit_elseif_stmt,
-			_ => unreachable!(),
-		};
-
-		if visit_method(visitor, self) == FlowControl::Continue {
+		if visitor.visit_if_stmt(self) == FlowControl::Continue {
 			self.condition.walk(visitor);
 			self.then_branch.walk(visitor);
-
-			if let Some(ref stmt) = self.elseif_branch {
-				stmt.walk(visitor);
-			}
 
 			if let Some(ref stmt) = self.else_branch {
 				stmt.walk(visitor);
