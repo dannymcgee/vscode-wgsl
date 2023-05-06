@@ -27,6 +27,5 @@ git = "https://github.com/dannymcgee/gramatika.git"
 branch = "main"
 
 [dependencies.naga]
-git = "https://github.com/gfx-rs/naga.git"
-rev = "633f1b33772a5da6dc8a14b698570cb9077c9a75"
+version = "0.12"
 features = ["span", "validate", "wgsl-in"]

@@ -1,4 +1,4 @@
-use gramatika::{Spanned, SpannedError};
+use gramatika::SpannedError;
 use itertools::Itertools;
 use lsp_types::{Diagnostic, DiagnosticSeverity, Range};
 use naga::{
@@ -45,20 +45,21 @@ impl IntoDiagnostics for WithSpan<NagaValidationError> {
 		let spans = self.spans().cloned().collect_vec();
 		let outer_msg = std::format!("{}", &self);
 		let inner_msg = match self.into_inner() {
+			InvalidHandle(inner) => inner.to_string(),
 			Layouter(inner) => inner.to_string(),
-			Type { error, .. } => error.to_string(),
-			Constant { error, .. } => error.to_string(),
-			GlobalVariable { error, .. } => error.to_string(),
-			Function { error, .. } => {
-				let fn_msg = error.to_string();
-				match error {
-					Expression { error, .. } => std::format!("{}: {}", fn_msg, error),
-					LocalVariable { error, .. } => std::format!("{}: {}", fn_msg, error),
+			Type { source, .. } => source.to_string(),
+			Constant { source, .. } => source.to_string(),
+			GlobalVariable { source, .. } => source.to_string(),
+			Function { source, .. } => {
+				let fn_msg = source.to_string();
+				match source {
+					Expression { source, .. } => std::format!("{}: {}", fn_msg, source),
+					LocalVariable { source, .. } => std::format!("{}: {}", fn_msg, source),
 					InvalidCall { error, .. } => std::format!("{}: {}", fn_msg, error),
 					_ => fn_msg,
 				}
 			}
-			EntryPoint { error, .. } => error.to_string(),
+			EntryPoint { source, .. } => source.to_string(),
 			Corrupted => "".into(),
 		};
 
@@ -84,32 +85,13 @@ impl IntoDiagnostics for WithSpan<NagaValidationError> {
 
 impl IntoDiagnostics for NagaParseError {
 	fn into_diagnostics(self, kind: ErrorKind, doc: &Document) -> Vec<Diagnostic> {
-		use gramatika::{Position, Span};
-
-		let (start_line, start_col) = self.location(&doc.source);
-		let pos = Position {
-			line: start_line - 1,
-			character: start_col - 1,
-		};
-		let needle_span = Span {
-			start: pos,
-			end: pos,
-		};
-
-		let full_span = doc
-			.tokens
-			.iter()
-			.find_map(|token| {
-				if token.span().contains(needle_span) {
-					Some(token.span())
-				} else {
-					None
-				}
-			})
-			.unwrap_or(needle_span);
+		let range = self
+			.location(&doc.source)
+			.map(|source_loc| source_loc.as_range(Some(&doc.source)))
+			.unwrap_or_default();
 
 		vec![DiagnosticBuilder::new(kind)
-			.range(full_span.as_range(None))
+			.range(range)
 			.severity(DiagnosticSeverity::ERROR)
 			.source("naga::parse")
 			.message(std::format!("ParseError: {}", self))
@@ -166,6 +148,31 @@ impl AsRange for naga::Span {
 		}
 
 		span.as_range(None)
+	}
+}
+
+impl AsRange for naga::SourceLocation {
+	fn as_range(&self, src: Option<&str>) -> Range {
+		let start = lsp_types::Position {
+			line: self.line_number - 1,
+			character: self.line_position - 1,
+		};
+
+		let mut end = start;
+		for (idx, c) in src.unwrap()[(self.offset as usize)..].chars().enumerate() {
+			match (idx, c) {
+				(i, '\n') if i < (self.length as usize) => {
+					end.line += 1;
+					end.character = 0;
+				}
+				(i, _) if i < (self.length as usize) => {
+					end.character += 1;
+				}
+				(_, _) => break,
+			}
+		}
+
+		Range { start, end }
 	}
 }
 
