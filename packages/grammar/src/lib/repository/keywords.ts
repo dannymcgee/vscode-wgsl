@@ -4,7 +4,7 @@ export const keyword: TMGrammarScope = {
 	patterns: [
 		{
 			match:
-				/\b(break|case|continu(e|ing)|default|else(if)?|fallthrough|for|if|loop|return|switch|from)\b/,
+				/\b(break|case|continu(e|ing)|default|else|enable|fallthrough|for|if|import|loop|return|switch|from)\b/,
 			name: "keyword.control.$1.wgsl",
 		},
 		{
