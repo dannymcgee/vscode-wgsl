@@ -1,7 +1,7 @@
 struct Globals {
     view_proj: mat4x4<f32>,
     num_lights: vec4<u32>,
-};
+}
 
 @group(0) @binding(0)
 var<uniform> u_globals: Globals;
@@ -9,7 +9,7 @@ var<uniform> u_globals: Globals;
 struct Entity {
     world: mat4x4<f32>,
     color: vec4<f32>,
-};
+}
 
 @group(1) @binding(0)
 var<uniform> u_entity: Entity;
@@ -23,7 +23,7 @@ struct VertexOutput {
     @builtin(position) proj_position: vec4<f32>,
     @location(0) world_normal: vec3<f32>,
     @location(1) world_position: vec4<f32>,
-};
+}
 
 @vertex
 fn vs_main(
@@ -45,11 +45,11 @@ struct Light {
     proj: mat4x4<f32>,
     pos: vec4<f32>,
     color: vec4<f32>,
-};
+}
 
 struct Lights {
     data: array<Light>,
-};
+}
 
 @group(0) @binding(1)
 var<storage, read> s_lights: Lights;

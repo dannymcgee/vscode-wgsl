@@ -16,7 +16,7 @@ struct VertexInput {
 	@location(0) position: vec3<f32>,
 	@location(1) tex_coords: vec2<f32>,
 	@location(2) normal: vec3<f32>,
-};
+}
 
 struct InstanceInput {
 	@location(5) model_matrix_0: vec4<f32>,
@@ -27,14 +27,14 @@ struct InstanceInput {
 	@location(9) normal_matrix_0: vec3<f32>,
 	@location(10) normal_matrix_1: vec3<f32>,
 	@location(11) normal_matrix_2: vec3<f32>,
-};
+}
 
 struct VertexOutput {
 	@builtin(position) clip_position: vec4<f32>,
 	@location(0) tex_coords: vec2<f32>,
 	@location(1) world_normal: vec3<f32>,
 	@location(2) world_position: vec3<f32>,
-};
+}
 
 @vertex
 fn vert(model: VertexInput, instance: InstanceInput) -> VertexOutput {

@@ -51,7 +51,7 @@ pub struct StructDecl {
 	pub storage_modifier: Option<Token>,
 	pub name: Token,
 	pub body: StructBody,
-	pub semicolon: Token,
+	pub semicolon: Option<Token>,
 }
 
 #[derive(Clone, DebugLisp)]
@@ -317,7 +317,11 @@ impl Parse for StructDecl {
 
 		let name = input.consume_kind(TokenKind::Ident)?;
 		let body = input.parse()?;
-		let semicolon = input.consume(punct![;])?;
+		let semicolon = if input.check(punct![;]) {
+			Some(input.consume(punct![;])?)
+		} else {
+			None
+		};
 
 		Ok(Self {
 			attributes: None,
@@ -332,7 +336,10 @@ impl Parse for StructDecl {
 
 impl Spanned for StructDecl {
 	fn span(&self) -> Span {
-		self.storage.span().through(self.semicolon.span())
+		match self.semicolon.as_ref() {
+			Some(semicolon) => self.storage.span().through(semicolon.span()),
+			None => self.storage.span().through(self.body.span()),
+		}
 	}
 }
 
