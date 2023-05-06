@@ -397,7 +397,7 @@ impl Parse for FieldDecl {
 		};
 		let name = input.consume_as(TokenKind::Ident, Token::field)?;
 		let ty = input.parse()?;
-		let semicolon = input.consume(punct![;])?;
+		let semicolon = input.consume(punct![,])?;
 
 		Ok(Self {
 			attributes,

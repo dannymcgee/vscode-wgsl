@@ -1,13 +1,13 @@
 struct LoremIpsum {
-	foo: f32;
-	bar: f32;
-	baz: f32;
+	foo: f32,
+	bar: f32,
+	baz: f32,
 };
 
 struct DolorSitAmet {
-	foo: f32;
-	bar: f32;
-	baz: f32;
+	foo: f32,
+	bar: f32,
+	baz: f32,
 };
 
 @fragment
