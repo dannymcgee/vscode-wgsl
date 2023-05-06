@@ -17,7 +17,7 @@ pub enum Token {
 	Pragma(Substr, Span),
 
 	#[subset_of(Ident)]
-	#[pattern = r"(array|atomic|bool|[fiu]32|mat[2-4]x[2-4]|ptr|sampler(_comparison)?|vec[2-4])"]
+	#[pattern = r"(array|atomic|bool|[fiu]32|mat[2-4]x[2-4][fh]?|ptr|sampler(_comparison)?|vec[2-4][iufh]?)"]
 	#[pattern = r"(texture_multisampled_2d)"]
 	#[pattern = r"(texture_external)"]
 	#[pattern = r"(texture_depth_(2d|cube)(_array)?)"]
