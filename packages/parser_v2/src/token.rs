@@ -26,7 +26,7 @@ pub enum Token {
 	Type(Substr, Span),
 
 	#[subset_of(Ident)]
-	#[pattern = r"(fn|let|struct|type|var|export)"]
+	#[pattern = r"(const|fn|let|struct|type|var|export)"]
 	#[pattern = r"(function|private|read(_write)?|storage|uniform|workgroup|write)"]
 	#[pattern = r"(break|case|continu(e|ing)|default|else(if)?|fallthrough|for|if|loop|return|switch|from)"]
 	#[pattern = r"(true|false)"]

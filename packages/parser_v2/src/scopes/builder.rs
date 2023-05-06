@@ -87,7 +87,7 @@ impl Visitor for ScopeBuilder {
 
 	fn visit_var_decl(&mut self, decl: &VarDecl) -> FlowControl {
 		match decl.storage.lexeme().as_str() {
-			"let" => simple_decl!(self, Const(decl)),
+			"const" | "let" => simple_decl!(self, Const(decl)),
 			"var" => simple_decl!(self, Var(decl)),
 			_ => unreachable!(),
 		}

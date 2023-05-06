@@ -174,14 +174,14 @@ impl Parse for Decl {
 					}
 				}
 				(Keyword, "var", _) => Ok(Decl::Var(input.parse()?)),
-				(Keyword, "let", _) => Ok(Decl::Const(input.parse()?)),
+				(Keyword, "let" | "const", _) => Ok(Decl::Const(input.parse()?)),
 				(Keyword, "type", _) => Ok(Decl::TypeAlias(input.parse()?)),
 				(Keyword, "struct", _) => Ok(Decl::Struct(input.parse()?)),
 				(Keyword, "fn", _) => Ok(Decl::Function(input.parse()?)),
 				(Keyword, "enable", _) => Ok(Decl::Extension(input.parse()?)),
 				(Keyword, "import", _) => Ok(Decl::Module(input.parse()?)),
 				(_, _, span) => Err(SpannedError {
-					message: "Expected `var`, `let`, `type`, `struct`, `fn`, `enable`, or `import`"
+					message: "Expected `var`, `let`, `const`, `type`, `struct`, `fn`, `enable`, or `import`"
 						.into(),
 					span: Some(span),
 					source: input.source(),
@@ -222,7 +222,7 @@ impl Parse for VarDecl {
 		let storage = input.consume_kind(TokenKind::Keyword)?;
 		assert!(matches!(
 			storage.as_matchable(),
-			(TokenKind::Keyword, "let" | "var", _)
+			(TokenKind::Keyword, "let" | "const" | "var", _)
 		));
 
 		let storage_qualifiers = if input.check(operator![<]) {

@@ -8,7 +8,7 @@ export const keyword: TMGrammarScope = {
 			name: "keyword.control.$1.wgsl",
 		},
 		{
-			match: /\b(struct|fn|var|let|type)\b/,
+			match: /\b(struct|fn|const|var|let|type)\b/,
 			name: "storage.type.$1.wgsl",
 		},
 		{
