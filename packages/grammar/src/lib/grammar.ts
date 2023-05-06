@@ -2,7 +2,7 @@ import { TMGrammar, regex } from "@vscode-devkit/grammar";
 
 import {
 	attribute,
-	attributeBody,
+	attributeParams,
 	comment,
 	IDENT,
 	identifier,
@@ -48,7 +48,7 @@ export const grammar: TMGrammar = {
 	],
 	repository: {
 		attribute,
-		attributeBody,
+		attributeParams,
 		comment,
 		identifier,
 		keyword,
