@@ -13,7 +13,7 @@ pub fn handle(id: RequestId, params: GotoDefinitionParams, docs: &Documents) -> 
 
 	let result = docs
 		.get(&uri)
-		.and_then(|document| {
+		.and_then(|document| -> Option<GotoDefinitionResponse> {
 			let tokens = &document.tokens;
 			let needle = tokens.iter().find(|token| {
 				let range = token.span().to_range();

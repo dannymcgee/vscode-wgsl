@@ -125,7 +125,7 @@ impl Diagnostics {
 			self.ipc
 				.send(Message::Notification(Notification {
 					method: PublishDiagnostics::METHOD.into(),
-					params: json::to_value(&PublishDiagnosticsParams {
+					params: json::to_value(PublishDiagnosticsParams {
 						diagnostics,
 						uri,
 						version: None,

@@ -30,7 +30,7 @@ fn get_lenses(params: &CodeLensParams, docs: &Documents) -> Option<Vec<CodeLens>
 	let lenses = tree
 		.inner
 		.iter()
-		.filter_map(|decl| {
+		.filter_map(|decl| -> Option<CodeLens> {
 			let ident_span = decl.name().span();
 			let pos = Position {
 				line: ident_span.start.line as u32,
