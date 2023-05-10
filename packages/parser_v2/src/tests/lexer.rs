@@ -40,6 +40,11 @@ fn one_char_tokens() {
 }
 
 #[test]
+fn unrecognized_input() {
+	match_tokens!(Unrecognized, ["'", "$"]);
+}
+
+#[test]
 fn comment() {
 	match_tokens!(Comment, ["// This is a line comment"]);
 }

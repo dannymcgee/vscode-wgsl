@@ -63,6 +63,9 @@ pub enum Token {
 	#[pattern = r"::?|[,.;@]"]
 	Punct(Substr, Span),
 
+	#[pattern = r"\S+"]
+	Unrecognized(Substr, Span),
+
 	// Tokens without patterns -- need to be upgraded
 	Attribute(Substr, Span),
 	Function(Substr, Span),
