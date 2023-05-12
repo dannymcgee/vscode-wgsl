@@ -4,7 +4,8 @@
 //!  * Most declarations spawn a new child scope which is valid through the end of the
 //!    scope which contains it. The starting point for declaration scopes depends on the
 //!    type of declaration:
-//!     - `var`, `let`, `type`, and `struct` bindings become active after their semicolon
+//!     - `var`, `let`, and `type` bindings become active after their semicolon
+//!     - `struct` bindings become active after their closing brace
 //!     - `fn` bindings become active after their opening brace
 //!  * Block statements (generally any chunk of code enclosed in curly braces, e.g.
 //!    following an `if` statement's condition expression) spawn a new child scope from
